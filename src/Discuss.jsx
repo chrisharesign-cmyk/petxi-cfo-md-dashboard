@@ -13,8 +13,9 @@ function critName(p, data) {
     : data.ocrit.find(c => c.id === p.criterion_id)?.name;
 }
 
-export default function DiscussTab({ data, me, onRefresh, onOpenCase }) {
+export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProjects }) {
   const [rowError, setRowError] = useState(null); // { id, msg }
+  const [toast, setToast] = useState('');
   const potentials = data.projects
     .filter(p => p.status === 'potential')
     .sort((a, b) => (b.grade_at_creation || 0) - (a.grade_at_creation || 0));
@@ -22,13 +23,27 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase }) {
   const overdue = data.projects.filter(p => p.due && overdueBy(p.due) && ['live', 'paused'].includes(p.status));
 
   const tick = async (p) => {
-    try { await promoteLive(p.id); setRowError(null); onRefresh(); }
-    catch (e) { setRowError({ id: p.id, msg: friendlyProjectError(e, data, p) }); }
+    try {
+      await promoteLive(p.id); setRowError(null);
+      setToast(`"${p.title}" is now live — find it any time in Excellence Projects.`);
+      onRefresh();
+    } catch (e) { setRowError({ id: p.id, msg: friendlyProjectError(e, data, p) }); }
+  };
+  const lineUp = async (p) => {
+    await queueProject(p.id);
+    setToast(`"${p.title}" moved to Excellence Projects, queued — it'll wait there until you promote it to live.`);
+    onRefresh();
   };
 
   return (
     <>
       <div className="panel-h"><span className="bar" style={{ background: 'var(--g4)' }} />Items to Discuss — {potentials.length} potential, worst grade first</div>
+      <p className="muted" style={{ marginBottom: '.8rem' }}>
+        This list only shows brand-new items nobody's decided on yet. <b>Tick</b> starts it as a live project right
+        now; <b>Line up</b> queues it for later — either way it leaves this list and moves to the{' '}
+        {onGoToProjects ? <button className="linklike" onClick={onGoToProjects}>Excellence Projects</button> : 'Excellence Projects'} tab, it isn't deleted.
+      </p>
+      {toast && <div className="card" style={{ marginBottom: '.8rem', borderColor: 'var(--g2)' }}>{toast}</div>}
       <div className="card">
         {!potentials.length && <p className="muted">Nothing waiting on a decision.</p>}
         {potentials.map(p => (
@@ -41,8 +56,8 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase }) {
               {rowError?.id === p.id && <p className="muted" style={{ color: 'var(--g4)' }}>{rowError.msg}</p>}
             </div>
             <div style={{ display: 'flex', gap: '.4rem' }}>
-              <button onClick={() => tick(p)}>Tick — start now</button>
-              <button onClick={async () => { await queueProject(p.id); onRefresh(); }}>Line up</button>
+              <button onClick={() => tick(p)} title="Start this as a live project right now">Tick — start now</button>
+              <button onClick={() => lineUp(p)} title="Queue it for later, without starting it yet">Line up — queue for later</button>
               <button onClick={() => onOpenCase(p.id)}>Details</button>
             </div>
           </div>
@@ -51,7 +66,8 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase }) {
 
       {(waiting.length > 0 || overdue.length > 0) && (
         <div className="card" style={{ marginTop: '1rem' }}>
-          {waiting.length > 0 && <p><b>{waiting.length}</b> queued, waiting for a live slot to free up.</p>}
+          {waiting.length > 0 && <p><b>{waiting.length}</b> queued, waiting for a live slot to free up
+            {onGoToProjects && <> — <button className="linklike" onClick={onGoToProjects}>view them</button></>}.</p>}
           {overdue.length > 0 && <p><b>{overdue.length}</b> overdue: {overdue.map(p => p.title).join(', ')}</p>}
         </div>
       )}

@@ -38,6 +38,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
         <span><span className="bar" style={{ background: 'var(--g1)' }} />Excellence Projects List — {data.projects.length} projects</span>
         <button onClick={() => setShowAdd(s => !s)}>{showAdd ? 'Cancel' : '+ Add project'}</button>
       </div>
+      <p className="muted" style={{ marginBottom: '.6rem' }}>Click any row to open it — pause, complete, cancel, add notes, or change its target date.</p>
 
       <div className="fchips">
         {[...STATUSES, 'Overdue', 'New this period'].map(f => (
