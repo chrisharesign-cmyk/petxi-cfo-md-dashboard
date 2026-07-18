@@ -33,7 +33,7 @@ table.matrix{border-collapse:separate;border-spacing:0;width:100%;min-width:1060
 .crit-col{text-align:left;min-width:215px;position:sticky;left:0;background:var(--card);z-index:4}
 .matrix td.crit{text-align:left;font-size:.83rem;font-weight:500;position:sticky;left:0;background:var(--card);z-index:2;border-right:1px solid var(--line-soft);padding-left:.6rem;cursor:help}
 .usep{border-right:1px solid var(--line)}
-.unit-name{font-weight:800;font-size:.8rem;line-height:1.2;display:block;cursor:pointer;background:none;border:none;color:inherit;font-family:inherit;padding:0;text-align:left}
+.unit-name{font-weight:800;font-size:.8rem;line-height:1.2;display:block;cursor:pointer;background:none;border:none;color:inherit;font-family:inherit;padding:0;text-align:center;width:100%}
 .unit-name:hover{text-decoration:underline}
 .unit-mean{display:inline-block;font-family:var(--mono);font-weight:600;font-size:.95rem;color:#fff;border-radius:6px;padding:.12rem .5rem;margin-top:.3rem}
 .sub-head{font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.08em;color:var(--ink-soft)}
