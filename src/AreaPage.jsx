@@ -50,11 +50,11 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase }) {
       <div className="panel-h" style={{ marginTop: '.6rem' }}>
         <span className="bar" style={{ background: 'var(--g2)' }} />
         <EditableText table={table} id={id} field="name" value={area?.name} className="areaTitle" />
-        <span style={{ marginLeft: 'auto', display: 'flex', gap: '1rem' }}>
-          <button className="linklike" onClick={copyAreaPrompt} title="Copies a prompt covering everything at 3 or 4 in this area — paste into claude.ai for a holistic plan">
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
+          <button className="btn" onClick={copyAreaPrompt} title="Copies a prompt covering everything at 3 or 4 in this area — paste into claude.ai for a holistic plan">
             {copied ? 'Copied ✓' : 'Explore with Claude'}
           </button>
-          <button className="linklike" onClick={() => window.print()}>Export PDF</button>
+          <button className="btn" onClick={() => window.print()}>Export PDF</button>
         </span>
       </div>
 

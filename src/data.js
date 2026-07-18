@@ -68,18 +68,21 @@ function descriptorFor(crit, unitId) {
 }
 
 async function loadForPeriod(periodId) {
-  const [criteriaR, ocritR, scoresR, oscoresR, projectsR] = await Promise.all([
+  const [criteriaR, ocritR, scoresR, oscoresR, projectsR, unitsR, ofuncsR] = await Promise.all([
     supa.from('criteria').select('*'),
     supa.from('org_criteria').select('*'),
     supa.from('scores').select('*').eq('period_id', periodId),
     supa.from('org_scores').select('*').eq('period_id', periodId),
     supa.from('projects').select('*'),
+    supa.from('units').select('*'),
+    supa.from('org_functions').select('*'),
   ]);
-  const err = [criteriaR, ocritR, scoresR, oscoresR, projectsR].find(r => r.error);
+  const err = [criteriaR, ocritR, scoresR, oscoresR, projectsR, unitsR, ofuncsR].find(r => r.error);
   if (err) throw err.error;
   return {
     criteria: criteriaR.data, ocrit: ocritR.data,
     scores: scoresR.data, oscores: oscoresR.data, projects: projectsR.data,
+    units: unitsR.data, ofuncs: ofuncsR.data,
   };
 }
 
@@ -103,14 +106,15 @@ function worstGrades(scores, oscores) {
 // §4.2 — one potential per cell-key graded 3 or 4 with no open project yet,
 // carrying that criterion's suggested solution. Safe to call repeatedly:
 // only ever fills gaps, never duplicates or touches existing projects.
-async function generatePotentials(worst, projects, critById, ocritById) {
+async function generatePotentials(worst, projects, critById, ocritById, unitById, ofuncById) {
   const openKeys = new Set(projects.filter(p => OPEN_STATUSES.includes(p.status)).map(projectCellKey));
   const toCreate = Object.entries(worst)
     .filter(([key, w]) => w.grade >= 3 && !openKeys.has(key))
     .map(([key, w]) => {
       const crit = w.scope === 'unit' ? critById[w.criterion_id] : ocritById[w.criterion_id];
+      const areaName = w.scope === 'unit' ? unitById[w.unit_id]?.name || w.unit_id : ofuncById[w.function_id]?.name || w.function_id;
       return {
-        title: `${crit?.name || w.criterion_id} — ${w.scope === 'unit' ? w.unit_id : w.function_id}`,
+        title: `${crit?.name || w.criterion_id} — ${areaName}`,
         scope: w.scope,
         unit_id: w.scope === 'unit' ? w.unit_id : null,
         function_id: w.scope === 'org' ? w.function_id : null,
@@ -132,11 +136,13 @@ async function generatePotentials(worst, projects, critById, ocritById) {
 // suggested solutions attached. Doesn't touch locked_at — both reviewers
 // can keep scoring right through it, and it's safe to run again later.
 export async function spoolProjects(periodId) {
-  const { criteria, ocrit, scores, oscores, projects } = await loadForPeriod(periodId);
+  const { criteria, ocrit, scores, oscores, projects, units, ofuncs } = await loadForPeriod(periodId);
   const critById = Object.fromEntries(criteria.map(c => [c.id, c]));
   const ocritById = Object.fromEntries(ocrit.map(c => [c.id, c]));
+  const unitById = Object.fromEntries(units.map(u => [u.id, u]));
+  const ofuncById = Object.fromEntries(ofuncs.map(f => [f.id, f]));
   const worst = worstGrades(scores, oscores);
-  const created = await generatePotentials(worst, projects, critById, ocritById);
+  const created = await generatePotentials(worst, projects, critById, ocritById, unitById, ofuncById);
   return { created };
 }
 
@@ -146,9 +152,11 @@ export async function spoolProjects(periodId) {
 // reviewers, stamps locked_at/locked_by. One-way — use spoolProjects()
 // for the routine "generate projects as we go" pass instead.
 export async function lockPeriod(periodId, lockedBy) {
-  const { criteria, ocrit, scores, oscores, projects } = await loadForPeriod(periodId);
+  const { criteria, ocrit, scores, oscores, projects, units, ofuncs } = await loadForPeriod(periodId);
   const critById = Object.fromEntries(criteria.map(c => [c.id, c]));
   const ocritById = Object.fromEntries(ocrit.map(c => [c.id, c]));
+  const unitById = Object.fromEntries(units.map(u => [u.id, u]));
+  const ofuncById = Object.fromEntries(ofuncs.map(f => [f.id, f]));
   const liveKeys = new Set(projects.filter(p => p.status === 'live').map(projectCellKey));
   const worst = worstGrades(scores, oscores);
 
@@ -172,7 +180,7 @@ export async function lockPeriod(periodId, lockedBy) {
     }).filter(Boolean),
   ]);
 
-  const created = await generatePotentials(worst, projects, critById, ocritById);
+  const created = await generatePotentials(worst, projects, critById, ocritById, unitById, ofuncById);
 
   const { error: lockErr } = await supa.from('sar_periods')
     .update({ locked_at: new Date().toISOString(), locked_by: lockedBy })

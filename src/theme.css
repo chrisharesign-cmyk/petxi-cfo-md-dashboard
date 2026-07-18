@@ -139,7 +139,9 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .btn.danger:hover{background:#8a2e33}
 .casefile h3{font-size:1.15rem}
 .casefile .st{font-size:.7rem;padding:.22rem .6rem}
-.casefile-meta{font-family:var(--mono);font-size:.72rem;color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:.3rem .5rem;align-items:center;margin:.4rem 0 .8rem}
+.casefile-meta{font-family:var(--mono);font-size:.72rem;color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:0}
+.casefile-meta + .casefile-meta{margin-bottom:.8rem}
+.casefile-meta .meta-sep{color:var(--line);opacity:.8}
 .casefile-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:.8rem 0;padding:.8rem;background:var(--paper);border-radius:8px}
 
 /* ---- compact status-change menu (table rows) ---- */
@@ -163,6 +165,11 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 /* ---- inline editing ---- */
 .editable{cursor:text;border-bottom:1px dashed var(--line)}
 .editable:hover{border-bottom-color:var(--xi)}
+/* Owner sits next to a boxed date input in the meta line and table — give
+   it the same resting "field" look instead of plain underlined text, so
+   the two equally-editable fields read as the same kind of control. */
+.casefile-meta .editable,.ptable .editable{border-bottom:none;border:1px dashed var(--line);border-radius:5px;padding:.12rem .4rem;background:var(--card)}
+.casefile-meta .editable:hover,.ptable .editable:hover{border-color:var(--xi)}
 .editform{display:inline-flex;gap:.3rem;align-items:center}
 .editform input{font:inherit;padding:.2rem .4rem;border:1px solid var(--line);border-radius:5px}
 .editform button{font-size:.7rem;padding:.2rem .5rem;border-radius:5px;border:1px solid var(--line);background:var(--paper);cursor:pointer}

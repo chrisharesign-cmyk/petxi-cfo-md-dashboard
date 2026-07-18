@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { addProject } from './data';
-import { STATUS_LABEL, statusBadge, fmtDate, overdueBy, daysInStage, isOverStageLimit } from './util';
+import { STATUS_LABEL, statusBadge, fmtDate, overdueBy, daysInStage, isOverStageLimit, gradeMovement } from './util';
 import { OwnerEditor, ImpactEditor, TargetEditor, StatusMenu } from './ProjectControls';
 import EditableText from './EditableText';
 
@@ -12,6 +12,8 @@ const COLUMNS = [
   { key: 'area', label: 'Area' },
   { key: 'owner', label: 'Owner' },
   { key: 'status', label: 'Status' },
+  { key: 'sar', label: 'SAR' },
+  { key: 'current', label: 'Current' },
   { key: 'impact', label: 'Impact' },
   { key: 'stage', label: 'At stage' },
   { key: 'target', label: 'Target' },
@@ -24,6 +26,8 @@ function sortValue(p, data, key) {
     case 'area': return `${areaName(p, data)} ${critName(p, data)}`.toLowerCase();
     case 'owner': return p.owner?.toLowerCase() || '￿'; // unowned sorts last
     case 'status': return statusBadge(p).label.toLowerCase();
+    case 'sar': return p.grade_at_creation ?? 99;
+    case 'current': return p.current_grade ?? p.grade_at_creation ?? 99;
     case 'impact': return p.impact ? IMPACT_RANK[p.impact] : 99;
     case 'stage': return daysInStage(p.status_changed_at) ?? -1;
     case 'target': return p.due || '9999-99-99';
@@ -58,6 +62,9 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
       if (f === 'Overdue' && p.due && overdueBy(p.due) && !['completed', 'cancelled'].includes(p.status)) return true;
       if (f === 'New this period' && periodStart && new Date(p.created_at) >= periodStart) return true;
       if (f === 'Mine' && p.owner === me) return true;
+      const m = gradeMovement(p);
+      if (f === 'Improved' && m?.improved) return true;
+      if (f === 'Slipped' && m && !m.improved) return true;
     }
     return false;
   }).sort((a, b) => {
@@ -78,7 +85,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
       </p>
 
       <div className="fchips">
-        {[...STATUSES, 'Overdue', 'New this period', 'Mine'].map(f => (
+        {[...STATUSES, 'Overdue', 'New this period', 'Mine', 'Improved', 'Slipped'].map(f => (
           <button key={f} className={`fchip ${filters.has(f) ? 'active' : ''}`} onClick={() => toggle(f)}>
             {STATUS_LABEL[f] || f}
           </button>
@@ -116,6 +123,14 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
                     <span className={`st ${badge.cls}`}>{badge.label}</span>
                     <StatusMenu project={p} data={data} onSaved={onRefresh} />
                   </td>
+                  <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>
+                    {p.grade_at_creation ? <span className={`chip s${p.grade_at_creation}`} style={{ position: 'static' }}>{p.grade_at_creation}</span> : '—'}
+                  </td>
+                  <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>
+                    {p.current_grade
+                      ? <span className={`chip s${p.current_grade}`} style={{ position: 'static' }}>{p.current_grade}</span>
+                      : <span className="muted">same</span>}
+                  </td>
                   <td><ImpactEditor project={p} onSaved={onRefresh} /></td>
                   <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>
                     {showDays ? <>{days}d{overLimit && <span className="overdue"> ⚠ over 14d limit</span>}</> : '—'}
@@ -130,7 +145,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
                 </tr>
               );
             })}
-            {!rows.length && <tr><td colSpan={8} className="muted">No projects match this filter.</td></tr>}
+            {!rows.length && <tr><td colSpan={10} className="muted">No projects match this filter.</td></tr>}
           </tbody>
         </table>
       </div>

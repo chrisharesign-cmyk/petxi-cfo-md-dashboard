@@ -135,36 +135,35 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
 
         <div className="casefile-meta">
           <span>{areaName(project, data)} &gt; {critName(project, data)}</span>
-          <span>· owner <OwnerEditor project={project} data={data} onSaved={onRefresh} /></span>
-          <span>· target <TargetEditor project={project} onSaved={onRefresh} /></span>
+          <span className="meta-sep">·</span>
+          <span>owner <OwnerEditor project={project} data={data} onSaved={onRefresh} /></span>
+          <span className="meta-sep">·</span>
+          <span>target <TargetEditor project={project} onSaved={onRefresh} /></span>
         </div>
 
-        <div>
+        <div className="casefile-meta" style={{ marginTop: '.3rem' }}>
           <span className={`st ${badge.cls}`}>{badge.label}</span>
           {days !== null && !['completed', 'cancelled'].includes(project.status) && (
-            <span className={`muted ${overLimit ? 'at-stage-warn' : ''}`} style={{ marginLeft: '.6rem', fontSize: '.76rem' }}>
+            <span className={overLimit ? 'at-stage-warn' : ''}>
               {days}d at this stage{overLimit ? ` ⚠ over 14d limit for ${PACE_LABEL[project.pace]}` : ''}
             </span>
           )}
-        </div>
-
-        {!['completed', 'cancelled'].includes(project.status) && (
-          <div style={{ margin: '.5rem 0', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-            <span className="muted" style={{ fontSize: '.76rem' }}>
-              Current read (informal — separate from the locked SAR score, graded {project.grade_at_creation} at creation):
+          {!['completed', 'cancelled'].includes(project.status) && <>
+            <span className="meta-sep">·</span>
+            <span title={`Informal — separate from the locked SAR score, graded ${project.grade_at_creation} at creation`}>
+              current read ⓘ <select className="formctl" value={project.current_grade ?? ''}
+                onChange={e => act(updateCurrentGrade, project.id, e.target.value ? Number(e.target.value) : null)}>
+                <option value="">— unchanged —</option>
+                {[1, 2, 3, 4].map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
             </span>
-            <select className="formctl" value={project.current_grade ?? ''}
-              onChange={e => act(updateCurrentGrade, project.id, e.target.value ? Number(e.target.value) : null)}>
-              <option value="">— unchanged —</option>
-              {[1, 2, 3, 4].map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
             {movement && (
-              <span style={{ color: movement.improved ? 'var(--g2)' : 'var(--g4)', fontWeight: 700, fontSize: '.8rem' }}>
+              <span style={{ color: movement.improved ? 'var(--g2)' : 'var(--g4)', fontWeight: 700 }}>
                 {movement.improved ? '🎉' : '⚠'} {movement.from} → {movement.to}
               </span>
             )}
-          </div>
-        )}
+          </>}
+        </div>
 
         <div className="casefile-actions">
           {project.status === 'potential' && <>
@@ -189,8 +188,8 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
 
         <div className="plan-box">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <b style={{ fontSize: '.78rem' }}>Plan</b>
-            <button className="linklike" onClick={copyPrompt} title="Copies a ready-made prompt describing this problem — paste it into claude.ai, then paste the answer back in below">
+            <h4 style={{ margin: 0 }}>Plan</h4>
+            <button className="btn" onClick={copyPrompt} title="Copies a ready-made prompt describing this problem — paste it into claude.ai, then paste the answer back in below">
               {copied ? 'Copied ✓' : 'Copy prompt for Claude'}
             </button>
           </div>
