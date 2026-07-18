@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { REVIEWERS } from './supa';
 import { setScore, clearScore, setOrgScore, clearOrgScore, unitCellKey, orgCellKey } from './data';
 import { BANDS, CRIT_BY_UNIT, meanGrade, countdown } from './matrixdata';
-import { STATUS_CLASS } from './util';
+import { STATUS_CLASS, gradeMovement } from './util';
 
 // Row/column labels are short jargon (eg. "Term pipeline coverage") — hover
 // shows the "on target" descriptor so reviewers know what's being measured.
@@ -27,6 +27,20 @@ function ProjectDot({ project, onOpenCase }) {
   return (
     <button className={`pdot ${STATUS_CLASS[project.status]} ${project.status === 'live' ? 'solid' : project.status === 'paused' ? 'striped' : 'hollow'}`}
       title={`${project.title} — ${project.status}`} onClick={(e) => { e.stopPropagation(); onOpenCase(project.id); }} />
+  );
+}
+
+// Informal re-read of a project's criterion, shown ghosted since it hasn't
+// gone through a formal SAR lock — a preview of where the grade is heading.
+function GhostGrade({ project, onOpenCase }) {
+  const movement = project && gradeMovement(project);
+  if (!movement) return null;
+  return (
+    <button className={`ghostgrade ${movement.improved ? 'up' : 'down'}`}
+      title={`${project.title} — current read ${movement.to} (was ${movement.from} at creation)`}
+      onClick={(e) => { e.stopPropagation(); onOpenCase(project.id); }}>
+      {movement.to}
+    </button>
   );
 }
 
@@ -75,6 +89,7 @@ export default function Qip({ data, me, myKey, onScore, canEdit, projectsByCell,
           title={!canEdit && snap ? `Locked — judged against: ${snap}` : clickable ? 'Click to grade' : `${REVIEWERS.find(r => r.key === rk).name}'s score${canEdit ? ' (read-only)' : ''}`}>
           {g || '–'}
         </button>
+        <GhostGrade project={project} onOpenCase={onOpenCase} />
         <ProjectDot project={project} onOpenCase={onOpenCase} />
       </span>
     );
@@ -208,6 +223,7 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, projectsByCell, onOpenAr
       <span className="chipwrap">
         <button className={`chip ${g ? ('s' + g) : 'empty'} ${clickable ? '' : 'readonly'}`}
           onClick={clickable ? (e) => open(e, f, c) : undefined}>{g || '–'}</button>
+        <GhostGrade project={project} onOpenCase={onOpenCase} />
         <ProjectDot project={project} onOpenCase={onOpenCase} />
       </span>
     );

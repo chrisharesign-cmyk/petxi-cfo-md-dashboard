@@ -216,6 +216,26 @@ export async function updateProjectDue(id, due) {
   if (error) throw error;
 }
 
+// current_grade is an informal, project-linked re-read of a criterion
+// between formal SAR periods — separate from the locked scores table, so
+// it never touches the official historical record. Changes are captured
+// automatically by the existing audit trigger on projects, which is what
+// the Activity tab's "what moved" section reads from.
+export async function updateCurrentGrade(id, grade) {
+  const { error } = await supa.from('projects')
+    .update({ current_grade: grade, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+
+// Everything that happened in the last `days` days, across every audited
+// table, for the Activity tab.
+export async function loadRecentActivity(days = 7) {
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const { data, error } = await supa.from('audit_log').select('*').gte('at', since).order('at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 // ---- project notes: append-only, an "edit" is a new row pointing at the old one ----
 export async function loadNotes(project_id) {
   const { data, error } = await supa.from('project_notes').select('*').eq('project_id', project_id).order('created_at');

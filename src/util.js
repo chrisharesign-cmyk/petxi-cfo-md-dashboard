@@ -159,3 +159,47 @@ export function describeChange(row) {
   if (!changed.length) return null; // nothing worth showing — caller should skip this row
   return changed.map(k => `${k}: "${before[k] ?? '—'}" → "${after[k] ?? '—'}"`).join('; ');
 }
+
+// current_grade is the informal, project-linked re-read — separate from the
+// locked scores table. Non-null and different from where it started means
+// something's genuinely moved (better or worse).
+export function gradeMovement(project) {
+  const baseline = project.grade_at_creation;
+  if (project.current_grade == null || baseline == null || project.current_grade === baseline) return null;
+  return { from: baseline, to: project.current_grade, improved: project.current_grade < baseline };
+}
+
+// Turns a raw audit_log row into a human sentence for the Activity tab.
+// Deliberately filters hard — routine scoring and minor field edits (owner,
+// target date, blocker text) would drown out the handful of things that
+// actually matter in a week: new projects, re-grades, status moves, notes,
+// locks, meetings.
+export function describeActivityRow(row, data) {
+  const projectTitle = (id) => data.projects.find(p => p.id === Number(id))?.title || `project #${id}`;
+
+  if (row.table_name === 'project_notes') {
+    if (row.action !== 'INSERT' || !row.new_row?.body) return null;
+    return { icon: '📝', text: `${row.new_row.author} updated "${projectTitle(row.new_row.project_id)}": ${row.new_row.body}` };
+  }
+  if (row.table_name === 'projects') {
+    if (row.action === 'INSERT') return { icon: '➕', text: `New project: "${row.new_row?.title}"` };
+    if (row.action !== 'UPDATE') return null;
+    const before = row.old_row || {}, after = row.new_row || {};
+    if (before.current_grade !== after.current_grade && after.current_grade != null) {
+      const from = before.current_grade ?? after.grade_at_creation;
+      const improved = from != null && after.current_grade < from;
+      return { icon: improved ? '🎉' : '⚠', text: `Re-graded "${after.title}": ${from ?? '—'} → ${after.current_grade}` };
+    }
+    if (before.status !== after.status) {
+      return { icon: '↪', text: `"${after.title}" moved to ${STATUS_LABEL[after.status] || after.status}${after.pace ? ` (${PACE_LABEL[after.pace]})` : ''}` };
+    }
+    return null;
+  }
+  if (row.table_name === 'sar_periods' && row.new_row?.locked_at && row.old_row?.locked_at == null) {
+    return { icon: '🔒', text: `${row.actor_name} locked the SAR (${row.new_row?.label || row.new_row?.id})` };
+  }
+  if (row.table_name === 'meetings' && row.action === 'UPDATE' && row.new_row?.ended_at && !row.old_row?.ended_at) {
+    return { icon: '🎙', text: `Meeting recorded (${(row.new_row?.transcript || []).length} lines captured)` };
+  }
+  return null;
+}

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supa } from './supa';
 import { loadNotes, addNote, editNote, promoteLive, queueProject, pauseProject, resumeLive,
-  moveBackLive, completeProject, cancelProject, updateProjectDue } from './data';
+  moveBackLive, completeProject, cancelProject, updateProjectDue, updateCurrentGrade } from './data';
 import { PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
-  friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt } from './util';
+  friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, gradeMovement } from './util';
 import EditableText from './EditableText';
 import { OwnerEditor, TargetEditor } from './ProjectControls';
 
@@ -17,7 +17,9 @@ function critName(p, data) {
     ? data.criteria.find(c => c.id === p.criterion_id)?.name
     : data.ocrit.find(c => c.id === p.criterion_id)?.name;
 }
-function currentGrade(p, data) {
+// The official SAR score right now — distinct from project.current_grade,
+// which is the informal, project-linked re-read between formal periods.
+function officialCurrentGrade(p, data) {
   const rows = p.scope === 'unit'
     ? data.scores.filter(s => s.unit_id === p.unit_id && s.criterion_id === p.criterion_id)
     : data.oscores.filter(s => s.function_id === p.function_id && s.criterion_id === p.criterion_id);
@@ -98,7 +100,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   const complete = async () => {
     const what = prompt('What changed? (required to complete)');
     if (!what) return;
-    await act(completeProject, project.id, { what_changed: what, grade_at_completion: currentGrade(project, data) });
+    await act(completeProject, project.id, { what_changed: what, grade_at_completion: project.current_grade ?? officialCurrentGrade(project, data) });
   };
   const cancel = async () => {
     const reason = prompt('Reason for cancelling (kept on record, not deleted):');
@@ -119,6 +121,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   const badge = statusBadge(project);
   const days = daysInStage(project.status_changed_at);
   const overLimit = isOverStageLimit(project, days);
+  const movement = gradeMovement(project);
   const copyPrompt = () => {
     navigator.clipboard?.writeText(buildProjectPrompt(project, data));
     setCopied(true); setTimeout(() => setCopied(false), 2500);
@@ -144,6 +147,24 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
             </span>
           )}
         </div>
+
+        {!['completed', 'cancelled'].includes(project.status) && (
+          <div style={{ margin: '.5rem 0', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+            <span className="muted" style={{ fontSize: '.76rem' }}>
+              Current read (informal — separate from the locked SAR score, graded {project.grade_at_creation} at creation):
+            </span>
+            <select className="formctl" value={project.current_grade ?? ''}
+              onChange={e => act(updateCurrentGrade, project.id, e.target.value ? Number(e.target.value) : null)}>
+              <option value="">— unchanged —</option>
+              {[1, 2, 3, 4].map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+            {movement && (
+              <span style={{ color: movement.improved ? 'var(--g2)' : 'var(--g4)', fontWeight: 700, fontSize: '.8rem' }}>
+                {movement.improved ? '🎉' : '⚠'} {movement.from} → {movement.to}
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="casefile-actions">
           {project.status === 'potential' && <>
@@ -203,8 +224,9 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
           ))}
         </div>
 
-        <form onSubmit={submitNote} style={{ marginTop: '.8rem', display: 'flex', gap: '.4rem' }}>
-          <input className="formctl" placeholder={`Add a note as ${me}`} value={noteBody} onChange={e => setNoteBody(e.target.value)} style={{ flex: 1 }} />
+        <p className="muted" style={{ fontSize: '.74rem', marginTop: '.8rem' }}>This is your progress-update log — what's happened with the plan since last time.</p>
+        <form onSubmit={submitNote} style={{ marginTop: '.3rem', display: 'flex', gap: '.4rem' }}>
+          <input className="formctl" placeholder={`What's happened this week? — ${me}`} value={noteBody} onChange={e => setNoteBody(e.target.value)} style={{ flex: 1 }} />
           <button className="btn primary" disabled={busy}>Add</button>
         </form>
       </div>

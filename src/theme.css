@@ -100,6 +100,13 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .pdot.hollow.st-embed{border-color:#614F56}.pdot.hollow.st-hold{border-color:#77607E}
 .pdot.striped{background:repeating-linear-gradient(45deg,#77607E,#77607E 2px,var(--card) 2px,var(--card) 4px)}
 
+/* ---- ghosted informal re-grade, opposite corner from the pdot ---- */
+.ghostgrade{position:absolute;left:-5px;top:-5px;width:1.1rem;height:1.1rem;border-radius:5px;padding:0;cursor:pointer;
+  font-family:var(--mono);font-size:.62rem;font-weight:700;display:flex;align-items:center;justify-content:center;
+  background:#c9c5b8;color:#5a564a;border:1.5px dashed #9a9585;opacity:.9}
+.ghostgrade.up{background:#cfe8c9;color:#2f6b2a;border-color:#7fb374}
+.ghostgrade.down{background:#f0d3d3;color:#8a2e33;border-color:#c98080}
+
 /* ---- modals (lock dialog, case file) ---- */
 .modal-backdrop{position:fixed;inset:0;background:rgba(23,34,44,.55);display:flex;align-items:center;justify-content:center;z-index:80;padding:1rem}
 .modal{background:var(--card);border-radius:12px;padding:1.6rem;max-width:520px;width:100%;max-height:86vh;overflow-y:auto;box-shadow:0 20px 60px rgba(23,34,44,.4);position:relative}
@@ -139,6 +146,14 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .statusmenu{position:absolute;right:0;top:100%;z-index:40;background:var(--card);border:1px solid var(--line);border-radius:9px;box-shadow:0 10px 24px rgba(23,34,44,.22);padding:.6rem;display:flex;flex-direction:column;gap:.4rem;min-width:170px}
 .statusmenu button{font-family:inherit;font-size:.76rem;padding:.35rem .6rem;border-radius:6px;border:1px solid var(--line);background:var(--paper);cursor:pointer;text-align:left}
 .statusmenu button:hover{background:var(--line-soft)}
+
+/* ---- activity tab ---- */
+.exec-summary{font-size:.9rem;margin-bottom:1rem;background:var(--ink);color:#f2f0e8;border-color:var(--ink)}
+.win-card{border-color:#7fb374;background:linear-gradient(180deg,#f3faf1,var(--card) 60%)}
+.win-row{font-size:.9rem}
+.stale-card{border-color:#c98080;background:linear-gradient(180deg,#fbf1f1,var(--card) 60%)}
+.activity-row{display:flex;gap:.8rem;align-items:baseline;padding:.4rem 0;border-bottom:1px solid var(--line-soft);font-size:.86rem}
+.activity-row:last-child{border-bottom:none}
 
 /* ---- sortable table headers ---- */
 .ptable th.sortable{cursor:pointer;user-select:none}
