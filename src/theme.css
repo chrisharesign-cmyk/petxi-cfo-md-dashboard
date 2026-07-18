@@ -89,6 +89,8 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .periodsel{font-family:var(--mono);font-size:.72rem;background:#1f2c38;color:#c8cdd2;border:1px solid #3a4854;border-radius:6px;padding:.25rem .5rem}
 .lockchip{font-family:var(--mono);font-size:.72rem;color:#c8cdd2;background:#1f2c38;border:1px solid #3a4854;border-radius:99px;padding:.3rem .8rem}
 .lockbtn{font-family:var(--mono);font-size:.72rem;font-weight:600;background:var(--xi);color:#fff;border:none;border-radius:99px;padding:.35rem .9rem;cursor:pointer}
+.lockbtn.spool{background:var(--g2)}
+.lockbtn:disabled{opacity:.6;cursor:default}
 
 /* ---- project chip + status dot ---- */
 .chipwrap{position:relative;display:inline-flex}

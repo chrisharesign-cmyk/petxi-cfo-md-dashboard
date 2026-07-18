@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import './theme.css';
 import { supa, REVIEWERS } from './supa';
-import { loadAll, lockPeriod, addProject, promoteLive, projectCellKey, OPEN_STATUSES } from './data';
+import { loadAll, lockPeriod, spoolProjects, addProject, promoteLive, projectCellKey, OPEN_STATUSES } from './data';
 import { nextPeriod, friendlyProjectError } from './util';
 import Qip from './Qip';
 import ProjectsTab from './Projects';
@@ -47,6 +47,8 @@ function Dashboard({ me, onLeave }) {
   const [err, setErr] = useState(null);
   const [save, setSave] = useState('');
   const [lockDialog, setLockDialog] = useState(null); // null | 'confirm' | 'working' | { cells }
+  const [spoolMsg, setSpoolMsg] = useState('');
+  const [spooling, setSpooling] = useState(false);
   const [areaView, setAreaView] = useState(null);
   const [caseFileId, setCaseFileId] = useState(null);
   const myKey = REVIEWERS.find(r => r.name === me)?.key;
@@ -93,6 +95,16 @@ function Dashboard({ me, onLeave }) {
     } catch (e) { setErr(e.message); setLockDialog(null); }
   }
 
+  async function doSpool() {
+    setSpooling(true); setSpoolMsg('');
+    try {
+      const res = await spoolProjects(periodId);
+      setSpoolMsg(res.created ? `${res.created} new project${res.created === 1 ? '' : 's'} spooled to Items to Discuss` : 'Nothing new — every 3/4 already has an open project');
+      await refresh();
+    } catch (e) { setErr(e.message); }
+    finally { setSpooling(false); setTimeout(() => setSpoolMsg(''), 4000); }
+  }
+
   async function startNextPeriod() {
     const np = nextPeriod(data.period);
     const { error } = await supa.from('sar_periods').insert(np);
@@ -128,11 +140,17 @@ function Dashboard({ me, onLeave }) {
           <div className="key-item"><span className="key-dot s2">2</span> On target / Licensed — no intervention</div>
           <div className="key-item"><span className="key-dot s3">3</span> Escalate — senior intervention this week</div>
           <div className="key-item"><span className="key-dot s4">4</span> Critical — in ICU, run under direct control</div>
-          <span style={{ marginLeft: 'auto' }}>
+          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+            {spoolMsg && <span className="lockchip">{spoolMsg}</span>}
             {!canEdit ? (
               <span className="lockchip">🔒 Locked by {data.period.locked_by} · {new Date(data.period.locked_at).toLocaleDateString('en-GB')}</span>
             ) : periodId === data.periods.find(p => !p.locked_at)?.id ? (
-              <button className="lockbtn" onClick={() => setLockDialog('confirm')}>Lock this SAR</button>
+              <>
+                <button className="lockbtn spool" disabled={spooling} onClick={doSpool} title="Scan current grades for any 3 or 4 and create a project for it, with a suggested solution — doesn't freeze anyone's scoring">
+                  {spooling ? 'Spooling…' : 'Spool projects'}
+                </button>
+                <button className="lockbtn" onClick={() => setLockDialog('confirm')}>Lock this SAR</button>
+              </>
             ) : null}
           </span>
         </div>
@@ -170,9 +188,10 @@ function LockDialog({ state, data, onConfirm, onClose, onResolve }) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <h3>Lock this SAR?</h3>
-        <p className="muted">This freezes every grade for both reviewers this period. After locking, no cell is
-          clickable and the wording each grade was judged against is snapshotted permanently. This cannot be
-          undone — the next period opens fresh drafts.</p>
+        <p className="muted">This is the final step, not the routine one — use "Spool projects" for generating
+          projects while you're still scoring. Locking freezes every grade for <b>both</b> reviewers this period,
+          including Fleur's. After locking, no cell is clickable and the wording each grade was judged against is
+          snapshotted permanently. This cannot be undone — the next period opens fresh drafts.</p>
         <div className="modal-actions">
           <button onClick={onClose}>Cancel</button>
           <button className="danger" onClick={onConfirm}>Yes, lock it</button>
