@@ -42,11 +42,17 @@ export function autoTarget(pace, period, from = new Date()) {
   return null;
 }
 
-// Days since a project entered its current status/pace. Rapid Fix items
-// past 14 days get flagged — everything else has no ceiling (yet).
+// Days since a project entered its current status/pace.
 export function daysInStage(statusChangedAt) {
   if (!statusChangedAt) return null;
   return Math.floor((Date.now() - new Date(statusChangedAt)) / 86400000);
+}
+
+// Rapid Fix (immediate) and Short-term (whose own target is 14 days out)
+// both get flagged past 14 days at the same stage — Mid/Long have no
+// ceiling since their whole point is a longer horizon.
+export function isOverStageLimit(project, days) {
+  return project.status === 'live' && ['rapid', 'short'].includes(project.pace) && days > 14;
 }
 
 // Next fiscal quarter after `p` (Oct-Dec Q1, Jan-Mar Q2, Apr-Jun Q3, Jul-Sep Q4).

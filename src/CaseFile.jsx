@@ -3,7 +3,7 @@ import { supa, REVIEWERS } from './supa';
 import { loadNotes, addNote, editNote, promoteLive, queueProject, pauseProject, resumeLive,
   moveBackLive, completeProject, cancelProject, updateProjectDue } from './data';
 import { STATUS_LABEL, PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
-  friendlyProjectError, daysInStage, buildProjectPrompt } from './util';
+  friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt } from './util';
 import EditableText from './EditableText';
 
 function areaName(p, data) {
@@ -127,7 +127,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
 
   const badge = statusBadge(project);
   const days = daysInStage(project.status_changed_at);
-  const overLimit = project.status === 'live' && project.pace === 'rapid' && days > 14;
+  const overLimit = isOverStageLimit(project, days);
   const copyPrompt = () => {
     navigator.clipboard?.writeText(buildProjectPrompt(project, data));
     setCopied(true); setTimeout(() => setCopied(false), 2500);
@@ -146,7 +146,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
           <span className={`st ${badge.cls}`}>{badge.label}</span>
           {days !== null && !['completed', 'cancelled'].includes(project.status) && (
             <span className={`muted ${overLimit ? 'at-stage-warn' : ''}`} style={{ marginLeft: '.6rem', fontSize: '.76rem' }}>
-              {days}d at this stage{overLimit ? ' ⚠ over 14d limit for Rapid Fix' : ''}
+              {days}d at this stage{overLimit ? ` ⚠ over 14d limit for ${PACE_LABEL[project.pace]}` : ''}
             </span>
           )}
         </p>

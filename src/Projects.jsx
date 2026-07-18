@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { addProject } from './data';
-import { STATUS_LABEL, statusBadge, fmtDate, overdueBy, daysInStage } from './util';
+import { STATUS_LABEL, statusBadge, fmtDate, overdueBy, daysInStage, isOverStageLimit } from './util';
 
 const RAG = { G: '#97D700', A: '#E8A317', R: '#D0342C' };
 const STATUSES = ['potential', 'queued', 'live', 'paused', 'completed', 'cancelled'];
@@ -28,6 +28,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
       if (STATUSES.includes(f) && p.status === f) return true;
       if (f === 'Overdue' && p.due && overdueBy(p.due) && !['completed', 'cancelled'].includes(p.status)) return true;
       if (f === 'New this period' && periodStart && new Date(p.created_at) >= periodStart) return true;
+      if (f === 'Mine' && p.owner === me) return true;
     }
     return false;
   });
@@ -41,7 +42,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
       <p className="muted" style={{ marginBottom: '.6rem' }}>Click any row to open it — pause, complete, cancel, add notes, or change its target date.</p>
 
       <div className="fchips">
-        {[...STATUSES, 'Overdue', 'New this period'].map(f => (
+        {[...STATUSES, 'Overdue', 'New this period', 'Mine'].map(f => (
           <button key={f} className={`fchip ${filters.has(f) ? 'active' : ''}`} onClick={() => toggle(f)}>
             {STATUS_LABEL[f] || f}
           </button>
@@ -64,7 +65,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
               const overdue = p.due && overdueBy(p.due) && !['completed', 'cancelled'].includes(p.status);
               const badge = statusBadge(p);
               const days = daysInStage(p.status_changed_at);
-              const overLimit = p.status === 'live' && p.pace === 'rapid' && days > 14;
+              const overLimit = isOverStageLimit(p, days);
               const showDays = days !== null && !['completed', 'cancelled'].includes(p.status);
               return (
                 <tr key={p.id} onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>
