@@ -183,7 +183,7 @@ function Company({ data, me, myKey, onScore }){
                 const m = unitMean(u.id);
                 return <th key={u.id} colSpan={2} className="usep">
                   <span className="unit-name">{u.name}</span>
-                  {m!==null && <span className="unit-mean" style={{background:`var(--g${meanGrade(m)})`}}>{m.toFixed(1)}</span>}
+                  {m!==null && <span className="unit-mean" style={{background:`var(--m-${meanGrade(m)})`}}>{m.toFixed(1)}</span>}
                 </th>;
               })}
             </tr>
@@ -295,7 +295,7 @@ function OrgMatrix({ ofuncs, ocrit, oscores, me, myKey, onScore }){
                 {ocrit.map(c=>REVIEWERS.map(r=>
                   <td key={c.id+r.key} className={r.key==='fs'?'usep':''}><Chip f={f} c={c} rk={r.key}/></td>))}
                 <td>{m===null?<span className="na">–</span>:
-                  <span className="unit-mean" style={{background:`var(--g${meanGrade(m)})`,marginTop:0}}>{m.toFixed(1)}</span>}</td>
+                  <span className="unit-mean" style={{background:`var(--m-${meanGrade(m)})`,marginTop:0}}>{m.toFixed(1)}</span>}</td>
               </tr>);})}
           </tbody>
         </table>

@@ -2,6 +2,7 @@
   --ink:#17222c; --ink-soft:#41505c; --paper:#f5f4ef; --card:#fff;
   --line:#ddd9cf; --line-soft:#eceadf; --xi:#D51A80;
   --g1:#D51A80; --g2:#44AFA1; --g3:#77607E; --g4:#A3393F; --icu:#7c2a30;
+  --m-m1:#D51A80; --m-m2:#44AFA1; --m-grey:#8D8C86; --m-brown:#8B5A2B; --m-m4:#A3393F;
   --mono:'IBM Plex Mono',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}

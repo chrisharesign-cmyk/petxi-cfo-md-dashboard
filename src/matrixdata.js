@@ -11,7 +11,15 @@ export const CRIT_BY_UNIT = {
   youth:['ys1','ys2'], adult:['as1','as2'],
 };
 export const PERIOD = { q:'Q4', range:'July – September' };
-export function meanGrade(m){ return m<2.0?1 : m<2.5?2 : m<3.0?3 : 4; }
+// Aggregate mean bands — distinct from the 1-4 individual score chips
+// (Mastery/On target/Escalate/Critical). Returns the CSS var suffix to use.
+export function meanGrade(m){
+  if (m < 2.0) return 'm1';
+  if (m < 2.5) return 'm2';
+  if (m < 2.8) return 'grey';
+  if (m < 3.0) return 'brown';
+  return 'm4';
+}
 export function countdown(){
   const now=new Date(); let end=new Date(now.getFullYear(),7,31,23,59,59);
   if(now>end) end=new Date(now.getFullYear()+1,7,31,23,59,59);
