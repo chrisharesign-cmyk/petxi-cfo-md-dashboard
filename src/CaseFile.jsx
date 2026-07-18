@@ -5,19 +5,9 @@ import { loadNotes, addNote, editNote, promoteLive, queueProject, pauseProject, 
 import { PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
   friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, gradeMovement } from './util';
 import EditableText from './EditableText';
-import { OwnerEditor, TargetEditor } from './ProjectControls';
+import { OwnerEditor, TargetEditor, AreaEditor } from './ProjectControls';
 import { usePrompt } from './Dialogs';
 
-function areaName(p, data) {
-  return p.scope === 'unit'
-    ? data.units.find(u => u.id === p.unit_id)?.name
-    : data.ofuncs.find(f => f.id === p.function_id)?.name;
-}
-function critName(p, data) {
-  return p.scope === 'unit'
-    ? data.criteria.find(c => c.id === p.criterion_id)?.name
-    : data.ocrit.find(c => c.id === p.criterion_id)?.name;
-}
 // The official SAR score right now — distinct from project.current_grade,
 // which is the informal, project-linked re-read between formal periods.
 function officialCurrentGrade(p, data) {
@@ -139,7 +129,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
         <h3><EditableText table="projects" id={project.id} field="title" value={project.title} onSaved={onRefresh} /></h3>
 
         <div className="casefile-meta">
-          <span>{areaName(project, data)} &gt; {critName(project, data)}</span>
+          <AreaEditor project={project} data={data} onSaved={onRefresh} />
           <span className="meta-sep">·</span>
           <span>owner <OwnerEditor project={project} data={data} onSaved={onRefresh} /></span>
           <span className="meta-sep">·</span>

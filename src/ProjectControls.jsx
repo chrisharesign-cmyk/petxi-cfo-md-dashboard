@@ -37,6 +37,77 @@ export function OwnerEditor({ project, data, onSaved }) {
   );
 }
 
+// Lets a project be moved to a different unit-criterion or org horizontal
+// after the fact — first-pass categorisation is often a best guess, this
+// is how it gets corrected without recreating the project from scratch.
+export function AreaEditor({ project, data, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [scope, setScope] = useState(project.scope);
+  const [areaId, setAreaId] = useState(project.scope === 'unit' ? project.unit_id : project.function_id);
+  const [criterionId, setCriterionId] = useState(project.criterion_id);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const areaName = project.scope === 'unit'
+    ? data.units.find(u => u.id === project.unit_id)?.name
+    : data.ofuncs.find(f => f.id === project.function_id)?.name;
+  const critName = project.scope === 'unit'
+    ? data.criteria.find(c => c.id === project.criterion_id)?.name
+    : data.ocrit.find(c => c.id === project.criterion_id)?.name;
+
+  if (!editing) {
+    return (
+      <span className="editable" onClick={(e) => {
+        e.stopPropagation();
+        setScope(project.scope);
+        setAreaId(project.scope === 'unit' ? project.unit_id : project.function_id);
+        setCriterionId(project.criterion_id);
+        setError('');
+        setEditing(true);
+      }}>
+        {areaName} &gt; {critName}
+      </span>
+    );
+  }
+
+  const critOptions = scope === 'unit'
+    ? data.criteria.filter(c => !c.unit_id || c.unit_id === areaId)
+    : data.ocrit;
+
+  const save = async () => {
+    if (!areaId || !criterionId) { setError('Pick an area and a criterion.'); return; }
+    setBusy(true); setError('');
+    const patch = scope === 'unit'
+      ? { scope: 'unit', unit_id: areaId, function_id: null, criterion_id: criterionId }
+      : { scope: 'org', unit_id: null, function_id: areaId, criterion_id: criterionId };
+    const { error } = await supa.from('projects').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', project.id);
+    setBusy(false);
+    if (error) { setError(friendlyProjectError(error, data, { ...project, ...patch })); return; }
+    setEditing(false);
+    onSaved?.();
+  };
+
+  return (
+    <span className="editform" onClick={e => e.stopPropagation()} style={{ flexWrap: 'wrap' }}>
+      <select className="formctl" value={scope} onChange={e => { setScope(e.target.value); setAreaId(''); setCriterionId(''); }}>
+        <option value="unit">Business unit</option>
+        <option value="org">Org function</option>
+      </select>
+      <select className="formctl" value={areaId || ''} onChange={e => { setAreaId(e.target.value); setCriterionId(''); }}>
+        <option value="">— area —</option>
+        {(scope === 'unit' ? data.units : data.ofuncs).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+      </select>
+      <select className="formctl" value={criterionId || ''} onChange={e => setCriterionId(e.target.value)} disabled={!areaId}>
+        <option value="">— criterion —</option>
+        {critOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      <button onClick={save} disabled={busy}>Save</button>
+      <button type="button" onClick={() => setEditing(false)}>Cancel</button>
+      {error && <span className="muted" style={{ color: 'var(--g4)', display: 'block', width: '100%' }}>{error}</span>}
+    </span>
+  );
+}
+
 const IMPACT_LABEL = { G: 'High', A: 'Medium', R: 'Low' };
 export function ImpactEditor({ project, onSaved }) {
   const save = async (val) => {
