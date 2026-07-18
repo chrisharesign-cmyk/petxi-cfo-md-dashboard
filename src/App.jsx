@@ -13,6 +13,18 @@ function critTip(c){
   return onTarget ? `${c.name} — ${onTarget}` : c.name;
 }
 
+// The score picker is position:fixed, so it never moves with page scroll —
+// if it opens below the viewport (eg. clicking the last few rows of a long
+// table) the 2/3/4 buttons render off-screen and are unreachable. Flip it
+// to open upward when there isn't room below.
+function pickPos(rect){
+  const estHeight = 300; // 4 grade buttons + Clear
+  const x = Math.min(rect.left, window.innerWidth - 310);
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const y = spaceBelow >= estHeight + 10 ? rect.bottom + 6 : Math.max(8, rect.top - estHeight - 6);
+  return { x, y };
+}
+
 function useGate(){
   const [me, setMe] = useState(() => localStorage.getItem('petxi-me') || '');
   const pick = n => { localStorage.setItem('petxi-me', n); setMe(n); };
@@ -133,8 +145,8 @@ function Company({ data, me, myKey, onScore }){
   const openPick = (e, c, uid) => {
     const rk = myKey;
     const r = e.currentTarget.getBoundingClientRect();
-    setPick({ cid:c.id, uid, labels:c.labels, desc:descFor(c,uid),
-      x:Math.min(r.left, window.innerWidth-310), y:r.bottom+6 });
+    const { x, y } = pickPos(r);
+    setPick({ cid:c.id, uid, labels:c.labels, desc:descFor(c,uid), x, y });
   };
   const choose = async g => {
     const { cid, uid } = pick;
@@ -257,7 +269,8 @@ function OrgMatrix({ ofuncs, ocrit, oscores, me, myKey, onScore }){
   };
   const [pick,setPick]=useState(null);
   const open=(e,f,c)=>{const r=e.currentTarget.getBoundingClientRect();
-    setPick({fid:f.id,cid:c.id,labels:c.labels,desc:c.descriptors,x:Math.min(r.left,window.innerWidth-310),y:r.bottom+6});};
+    const {x,y}=pickPos(r);
+    setPick({fid:f.id,cid:c.id,labels:c.labels,desc:c.descriptors,x,y});};
   const choose=async g=>{const{fid,cid}=pick;
     if(g===0) await onScore(clearOrgScore,{function_id:fid,criterion_id:cid});
     else await onScore(setOrgScore,{function_id:fid,criterion_id:cid,score:g}); setPick(null);};

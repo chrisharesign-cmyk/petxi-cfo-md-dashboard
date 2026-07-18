@@ -47,7 +47,7 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .chip.readonly{cursor:default;opacity:.9}.chip.readonly:hover{transform:none}
 .chip.empty{background:transparent;color:#b6b1a3;border:1.5px dashed var(--line);font-weight:500}
 .na{color:#c6c2b6}
-.pick{position:fixed;z-index:60;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(23,34,44,.28);padding:.4rem;width:300px}
+.pick{position:fixed;z-index:60;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(23,34,44,.28);padding:.4rem;width:300px;max-height:calc(100vh - 16px);overflow-y:auto}
 .pick button{display:flex;gap:.55rem;align-items:flex-start;width:100%;text-align:left;background:none;border:none;border-radius:7px;padding:.5rem;cursor:pointer}
 .pick button:hover{background:var(--paper)}
 .pick .pd{flex:none;width:1.5rem;height:1.5rem;border-radius:5px;color:#fff;font-family:var(--mono);font-weight:600;font-size:.72rem;display:flex;align-items:center;justify-content:center;margin-top:.1rem}
