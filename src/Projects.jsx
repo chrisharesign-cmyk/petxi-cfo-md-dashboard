@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { addProject } from './data';
-import { STATUS_LABEL, statusBadge, fmtDate, overdueBy, daysInStage, isOverStageLimit, gradeMovement } from './util';
+import { STATUS_LABEL, statusBadge, statusSortKey, fmtDate, overdueBy, daysInStage, isOverStageLimit, gradeMovement } from './util';
 import { OwnerEditor, ImpactEditor, TargetEditor, StatusMenu } from './ProjectControls';
 import EditableText from './EditableText';
 
@@ -18,6 +18,8 @@ const COLUMNS = [
   { key: 'stage', label: 'At stage' },
   { key: 'target', label: 'Target' },
   { key: 'blocker', label: 'Blocker' },
+  { key: 'created', label: 'Added' },
+  { key: 'updated', label: 'Updated' },
 ];
 const IMPACT_RANK = { G: 0, A: 1, R: 2 };
 function sortValue(p, data, key) {
@@ -25,13 +27,15 @@ function sortValue(p, data, key) {
     case 'title': return p.title?.toLowerCase() || '';
     case 'area': return `${areaName(p, data)} ${critName(p, data)}`.toLowerCase();
     case 'owner': return p.owner?.toLowerCase() || '￿'; // unowned sorts last
-    case 'status': return statusBadge(p).label.toLowerCase();
+    case 'status': return statusSortKey(p); // real timescale, not alphabetical
     case 'sar': return p.grade_at_creation ?? 99;
     case 'current': return p.current_grade ?? p.grade_at_creation ?? 99;
     case 'impact': return p.impact ? IMPACT_RANK[p.impact] : 99;
     case 'stage': return daysInStage(p.status_changed_at) ?? -1;
     case 'target': return p.due || '9999-99-99';
     case 'blocker': return p.blocked_by?.toLowerCase() || '';
+    case 'created': return p.created_at || '';
+    case 'updated': return p.updated_at || '';
     default: return '';
   }
 }
@@ -142,10 +146,12 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
                   <td onClick={e => e.stopPropagation()}>
                     <EditableText table="projects" id={p.id} field="blocked_by" value={p.blocked_by} placeholder="—" onSaved={onRefresh} />
                   </td>
+                  <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>{fmtDate(p.created_at?.slice(0, 10))}</td>
+                  <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>{fmtDate(p.updated_at?.slice(0, 10))}</td>
                 </tr>
               );
             })}
-            {!rows.length && <tr><td colSpan={10} className="muted">No projects match this filter.</td></tr>}
+            {!rows.length && <tr><td colSpan={12} className="muted">No projects match this filter.</td></tr>}
           </tbody>
         </table>
       </div>

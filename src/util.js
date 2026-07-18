@@ -25,6 +25,20 @@ export function statusBadge(p) {
   return { label: STATUS_LABEL[p.status], cls: STATUS_CLASS[p.status] };
 }
 
+// Real-timescale ordering for the status/pace column — not alphabetical.
+// Done, then live work furthest-out to nearest, then not-yet-live, then
+// parked, then cancelled. Live projects sharing a pace bucket (e.g. every
+// "Long term" project, which can now be scheduled to any specific future
+// quarter) are broken up by actual target date, not lumped together.
+const STATUS_RANK = {
+  completed: 0, 'live:long': 1, 'live:mid': 2, 'live:short': 2, 'live:rapid': 3,
+  queued: 4, potential: 5, paused: 6, cancelled: 7,
+};
+export function statusSortKey(p) {
+  const rank = p.status === 'live' ? (STATUS_RANK[`live:${p.pace}`] ?? 3.5) : (STATUS_RANK[p.status] ?? 8);
+  return `${String(rank).padStart(2, '0')}-${p.due || '9999-99-99'}`;
+}
+
 // Pace target dates. rapid = coming Friday; short = +2 weeks;
 // mid = end of this SAR period; long = end of the next SAR period.
 export function autoTarget(pace, period, from = new Date()) {
