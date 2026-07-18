@@ -22,14 +22,19 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
   const waiting = data.projects.filter(p => p.status === 'queued');
   const overdue = data.projects.filter(p => p.due && overdueBy(p.due) && ['live', 'paused'].includes(p.status));
 
-  const tick = async (p) => {
+  // The default habit is Rapid Fix, one click. Anything else (Short/Mid/
+  // Long term) is picked from the case file, which is why the row itself
+  // is clickable — this is the fix for "clicking a project shows nothing".
+  const tick = async (p, e) => {
+    e.stopPropagation();
     try {
-      await promoteLive(p.id); setRowError(null);
-      setToast(`"${p.title}" is now live — find it any time in Excellence Projects.`);
+      await promoteLive(p.id, 'rapid', data.period); setRowError(null);
+      setToast(`"${p.title}" is now live as Rapid Fix — find it any time in Excellence Projects.`);
       onRefresh();
-    } catch (e) { setRowError({ id: p.id, msg: friendlyProjectError(e, data, p) }); }
+    } catch (e2) { setRowError({ id: p.id, msg: friendlyProjectError(e2, data, p) }); }
   };
-  const lineUp = async (p) => {
+  const lineUp = async (p, e) => {
+    e.stopPropagation();
     await queueProject(p.id);
     setToast(`"${p.title}" moved to Excellence Projects, queued — it'll wait there until you promote it to live.`);
     onRefresh();
@@ -39,26 +44,27 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
     <>
       <div className="panel-h"><span className="bar" style={{ background: 'var(--g4)' }} />Items to Discuss — {potentials.length} potential, worst grade first</div>
       <p className="muted" style={{ marginBottom: '.8rem' }}>
-        This list only shows brand-new items nobody's decided on yet. <b>Tick</b> starts it as a live project right
-        now; <b>Line up</b> queues it for later — either way it leaves this list and moves to the{' '}
+        Click a project to open it — that's where the plan lives, and where you can assign an owner or agree a
+        different pace (Short, Mid or Long term instead of the Rapid Fix default). <b>Agree — Rapid Fix</b> here is
+        the one-click shortcut for the common case; <b>Line up</b> queues it for later. Either way it leaves this
+        list and moves to the{' '}
         {onGoToProjects ? <button className="linklike" onClick={onGoToProjects}>Excellence Projects</button> : 'Excellence Projects'} tab, it isn't deleted.
       </p>
       {toast && <div className="card" style={{ marginBottom: '.8rem', borderColor: 'var(--g2)' }}>{toast}</div>}
       <div className="card">
         {!potentials.length && <p className="muted">Nothing waiting on a decision.</p>}
         {potentials.map(p => (
-          <div key={p.id} className="discussrow">
+          <div key={p.id} className="discussrow" style={{ cursor: 'pointer' }} onClick={() => onOpenCase(p.id)}>
             <span className="key-dot s4" style={{ width: '1.4rem', height: '1.4rem', fontSize: '.8rem' }}>{p.grade_at_creation}</span>
             <div style={{ flex: 1 }}>
               <b>{p.title}</b><br />
-              <span className="muted">{areaName(p, data)} &gt; {critName(p, data)}</span>
+              <span className="muted">{areaName(p, data)} &gt; {critName(p, data)}{p.owner ? ` · owner ${p.owner}` : ''}</span>
               {p.suggested_solution && <p className="muted" style={{ marginTop: '.3rem' }}>{p.suggested_solution}</p>}
               {rowError?.id === p.id && <p className="muted" style={{ color: 'var(--g4)' }}>{rowError.msg}</p>}
             </div>
             <div style={{ display: 'flex', gap: '.4rem' }}>
-              <button onClick={() => tick(p)} title="Start this as a live project right now">Tick — start now</button>
-              <button onClick={() => lineUp(p)} title="Queue it for later, without starting it yet">Line up — queue for later</button>
-              <button onClick={() => onOpenCase(p.id)}>Details</button>
+              <button onClick={(e) => tick(p, e)} title="Agree this as-is and start it immediately">Agree — Rapid Fix</button>
+              <button onClick={(e) => lineUp(p, e)} title="Queue it for later, without starting it yet">Line up</button>
             </div>
           </div>
         ))}

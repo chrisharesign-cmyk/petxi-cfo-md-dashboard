@@ -127,6 +127,10 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .editform{display:inline-flex;gap:.3rem;align-items:center}
 .editform input{font:inherit;padding:.2rem .4rem;border:1px solid var(--line);border-radius:5px}
 .editform button{font-size:.7rem;padding:.2rem .5rem;border-radius:5px;border:1px solid var(--line);background:var(--paper);cursor:pointer}
+div.editform{display:block}
+div.editform textarea{font:inherit;width:100%;padding:.5rem;border:1px solid var(--line);border-radius:6px;resize:vertical;margin-bottom:.3rem}
+.plan-box{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:.7rem .9rem;margin:.6rem 0}
+.at-stage-warn{color:var(--g4);font-weight:600}
 .areaTitle{font-size:1.2rem;font-weight:800}
 
 /* ---- mobile ---- */

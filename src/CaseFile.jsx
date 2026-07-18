@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { supa } from './supa';
+import { supa, REVIEWERS } from './supa';
 import { loadNotes, addNote, editNote, promoteLive, queueProject, pauseProject, resumeLive,
   moveBackLive, completeProject, cancelProject, updateProjectDue } from './data';
-import { STATUS_LABEL, fmtDate, describeChange, friendlyProjectError } from './util';
+import { STATUS_LABEL, PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
+  friendlyProjectError, daysInStage } from './util';
+import EditableText from './EditableText';
 
 function areaName(p, data) {
   return p.scope === 'unit'
@@ -19,6 +21,30 @@ function currentGrade(p, data) {
     ? data.scores.filter(s => s.unit_id === p.unit_id && s.criterion_id === p.criterion_id)
     : data.oscores.filter(s => s.function_id === p.function_id && s.criterion_id === p.criterion_id);
   return rows.length ? Math.max(...rows.map(r => r.score)) : null;
+}
+
+function OwnerPicker({ project, act }) {
+  return (
+    <select value={project.owner || ''} onChange={e => act(async () => {
+      const { error } = await supa.from('projects').update({ owner: e.target.value || null, updated_at: new Date().toISOString() }).eq('id', project.id);
+      if (error) throw error;
+    })}>
+      <option value="">— no owner yet —</option>
+      {REVIEWERS.map(r => <option key={r.key} value={r.name}>{r.name}</option>)}
+    </select>
+  );
+}
+
+function AgreePace({ project, data, act }) {
+  const [pace, setPace] = useState('rapid');
+  return (
+    <span style={{ display: 'inline-flex', gap: '.4rem', alignItems: 'center' }}>
+      <select value={pace} onChange={e => setPace(e.target.value)}>
+        {['rapid', 'short', 'mid', 'long'].map(p => <option key={p} value={p}>{PACE_LABEL[p]} — {PACE_DESC[p]}</option>)}
+      </select>
+      <button onClick={() => act(promoteLive, project.id, pace, data.period)}>Agree</button>
+    </span>
+  );
 }
 
 export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
@@ -42,7 +68,14 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   };
   useEffect(() => { load(); }, [projectId]);
 
-  if (!project) return null;
+  if (!project) return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <button className="modalclose" onClick={onClose}>×</button>
+        <p>Couldn't find that project — it may have just been refreshed. Close and try again.</p>
+      </div>
+    </div>
+  );
 
   // A note's edit history is a chain of rows linked by replaces_note_id.
   // Walk forward from the root to the latest version; show that as current,
@@ -91,20 +124,33 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
     setEditingId(null);
   };
 
+  const badge = statusBadge(project);
+  const days = daysInStage(project.status_changed_at);
+  const overLimit = project.status === 'live' && project.pace === 'rapid' && days > 14;
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal casefile" onClick={e => e.stopPropagation()}>
         <button className="modalclose" onClick={onClose}>×</button>
         <h3>{project.title}</h3>
-        <p className="muted">{areaName(project, data)} &gt; {critName(project, data)} · owner {project.owner || '—'} · target {fmtDate(project.due)}</p>
-        <p><span className={`st st-${project.status === 'live' ? 'rapid' : project.status === 'completed' ? 'done' : 'hold'}`}>{STATUS_LABEL[project.status]}</span></p>
+        <p className="muted">
+          {areaName(project, data)} &gt; {critName(project, data)} · owner <OwnerPicker project={project} act={act} /> · target {fmtDate(project.due)}
+        </p>
+        <p>
+          <span className={`st ${badge.cls}`}>{badge.label}</span>
+          {days !== null && !['completed', 'cancelled'].includes(project.status) && (
+            <span className={`muted ${overLimit ? 'at-stage-warn' : ''}`} style={{ marginLeft: '.6rem', fontSize: '.76rem' }}>
+              {days}d at this stage{overLimit ? ' ⚠ over 14d limit for Rapid Fix' : ''}
+            </span>
+          )}
+        </p>
 
-        <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', margin: '.6rem 0' }}>
+        <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center', margin: '.6rem 0' }}>
           {project.status === 'potential' && <>
-            <button disabled={busy} onClick={() => act(promoteLive, project.id)}>Tick — start now</button>
-            <button disabled={busy} onClick={() => act(queueProject, project.id)}>Line up</button>
+            <AgreePace project={project} data={data} act={act} />
+            <button disabled={busy} onClick={() => act(queueProject, project.id)}>Line up — queue for later</button>
           </>}
-          {project.status === 'queued' && <button disabled={busy} onClick={() => act(promoteLive, project.id)}>Promote to live</button>}
+          {project.status === 'queued' && <AgreePace project={project} data={data} act={act} />}
           {project.status === 'live' && <>
             <button disabled={busy} onClick={() => act(pauseProject, project.id)}>Pause</button>
             <button disabled={busy} onClick={complete}>Complete</button>
@@ -122,7 +168,13 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
         {project.status === 'completed' && (
           <p className="muted">Created at {project.grade_at_creation} → completed at {project.grade_at_completion ?? '—'}. {project.what_changed}</p>
         )}
-        {project.suggested_solution && <p className="muted"><b>Suggested:</b> {project.suggested_solution}</p>}
+
+        <div className="plan-box">
+          <b style={{ fontSize: '.78rem' }}>Plan</b>
+          <EditableText table="projects" id={project.id} field="suggested_solution" value={project.suggested_solution}
+            placeholder="No plan yet — click to write one" multiline
+            onSaved={onRefresh} />
+        </div>
 
         <h4 style={{ marginTop: '1rem' }}>Timeline</h4>
         <div className="feed">

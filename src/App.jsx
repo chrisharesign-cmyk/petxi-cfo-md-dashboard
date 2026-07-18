@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import './theme.css';
 import { supa, REVIEWERS } from './supa';
 import { loadAll, lockPeriod, spoolProjects, addProject, promoteLive, projectCellKey, OPEN_STATUSES } from './data';
-import { nextPeriod, friendlyProjectError } from './util';
+import { nextPeriod, friendlyProjectError, autoTarget } from './util';
 import Qip from './Qip';
 import ProjectsTab from './Projects';
 import DiscussTab from './Discuss';
@@ -156,7 +156,7 @@ function Dashboard({ me, onLeave }) {
         </div>
       </header>
       <nav className="tabs">
-        {[['qip', 'PET-Xi QIP'], ['projects', 'Excellence Projects'], ['discuss', 'Items to Discuss']].map(([k, l]) => (
+        {[['qip', 'SAR'], ['discuss', 'Items to Discuss'], ['projects', 'Excellence Projects']].map(([k, l]) => (
           <button key={k} className={tab === k ? 'active' : ''} onClick={() => { setTab(k); setAreaView(null); }}>{l}</button>
         ))}
       </nav>
@@ -229,12 +229,14 @@ function BlockerRow({ cell, data, onResolve }) {
   const act = async () => {
     setBusy(true); setError('');
     try {
-      if (existing) await promoteLive(existing.id);
+      // A 4 blocking the lock needs action right now — defaults to Rapid Fix.
+      if (existing) await promoteLive(existing.id, 'rapid', data.period);
       else await addProject({
         title: `${critName} — ${areaName}`, scope: cell.scope,
         unit_id: cell.scope === 'unit' ? cell.unit_id : null,
         function_id: cell.scope === 'org' ? cell.function_id : null,
         criterion_id: cell.criterion_id, status: 'live', grade_at_creation: 4,
+        pace: 'rapid', due: autoTarget('rapid', data.period),
       });
       await onResolve();
     } catch (e) { setError(friendlyProjectError(e, data, { scope: cell.scope, unit_id: cell.unit_id, function_id: cell.function_id, criterion_id: cell.criterion_id })); }

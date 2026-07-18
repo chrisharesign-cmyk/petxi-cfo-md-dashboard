@@ -2,28 +2,51 @@
 
 export const STATUS_LABEL = {
   potential: 'Potential', queued: 'Queued', live: 'Live',
-  paused: 'Paused', completed: 'Completed', cancelled: 'Cancelled',
+  paused: 'On Hold', completed: 'Completed', cancelled: 'Cancelled',
 };
 export const STATUS_CLASS = {
   potential: 'st-embed', queued: 'st-hold', live: 'st-rapid',
   paused: 'st-hold', completed: 'st-done', cancelled: 'st-embed',
 };
 
-// §5.9 — target dates auto-fill from status at creation, editable after.
-// rapid/live-from-a-4 = coming Friday; short = +1 month; mid = 31 Aug; long = 31 Dec.
-export function autoTarget(kind, from = new Date()) {
+// Pace is chosen once, at the moment a project is agreed and goes live —
+// it drives both the badge shown in Excellence Projects and the target date.
+export const PACE_LABEL = { rapid: 'Rapid Fix', short: 'Short & mid-term', mid: 'Short & mid-term', long: 'Long term' };
+export const PACE_CLASS = { rapid: 'st-rapid', short: 'st-fix', mid: 'st-fix', long: 'st-embed' };
+export const PACE_DESC = {
+  rapid: 'Immediate — what can be done right away', short: 'Two weeks out',
+  mid: 'By the end of this SAR period', long: 'By the end of the next SAR period',
+};
+
+// The badge shown in Excellence Projects: pace for live projects, plain
+// status label for everything else (queued/paused/completed/...).
+export function statusBadge(p) {
+  if (p.status === 'live' && p.pace) return { label: PACE_LABEL[p.pace], cls: PACE_CLASS[p.pace] };
+  return { label: STATUS_LABEL[p.status], cls: STATUS_CLASS[p.status] };
+}
+
+// Pace target dates. rapid = coming Friday; short = +2 weeks;
+// mid = end of this SAR period; long = end of the next SAR period.
+export function autoTarget(pace, period, from = new Date()) {
   const d = new Date(from);
-  if (kind === 'rapid') {
+  if (pace === 'rapid') {
     const day = d.getDay(); // 0 Sun..6 Sat, Friday=5
     let add = (5 - day + 7) % 7;
     if (add === 0) add = 7; // today is Friday or later in the week -> next Friday
     d.setDate(d.getDate() + add);
     return d.toISOString().slice(0, 10);
   }
-  if (kind === 'short') { d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 10); }
-  if (kind === 'mid') return `${d.getFullYear()}-08-31`;
-  if (kind === 'long') return `${d.getFullYear()}-12-31`;
+  if (pace === 'short') { d.setDate(d.getDate() + 14); return d.toISOString().slice(0, 10); }
+  if (pace === 'mid') return period?.ends || null;
+  if (pace === 'long') return period ? nextPeriod(period).ends : null;
   return null;
+}
+
+// Days since a project entered its current status/pace. Rapid Fix items
+// past 14 days get flagged — everything else has no ceiling (yet).
+export function daysInStage(statusChangedAt) {
+  if (!statusChangedAt) return null;
+  return Math.floor((Date.now() - new Date(statusChangedAt)) / 86400000);
 }
 
 // Next fiscal quarter after `p` (Oct-Dec Q1, Jan-Mar Q2, Apr-Jun Q3, Jul-Sep Q4).

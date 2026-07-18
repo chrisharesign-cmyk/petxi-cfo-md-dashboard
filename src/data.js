@@ -1,4 +1,5 @@
 import { supa, weekStart } from './supa';
+import { autoTarget } from './util';
 
 // ---- cell-key helpers: a project's identity ignores the reviewer dimension ----
 export const unitCellKey = (unit_id, criterion_id) => `unit:${unit_id}:${criterion_id}`;
@@ -116,7 +117,7 @@ async function generatePotentials(worst, projects, critById, ocritById) {
         criterion_id: w.criterion_id,
         status: 'potential',
         grade_at_creation: w.grade,
-        suggested_solution: crit?.solution || null,
+        suggested_solution: crit?.solution || 'Claude integration coming soon — draft the starting plan here.',
       };
     });
   if (toCreate.length) {
@@ -187,14 +188,21 @@ export async function addProject(p) {
   return data;
 }
 async function setStatus(id, status, extra = {}) {
-  const { error } = await supa.from('projects').update({ status, updated_at: new Date().toISOString(), ...extra }).eq('id', id);
+  const now = new Date().toISOString();
+  const { error } = await supa.from('projects')
+    .update({ status, updated_at: now, status_changed_at: now, ...extra }).eq('id', id);
   if (error) throw error;
 }
-export const promoteLive = (id) => setStatus(id, 'live');
+// Pace is chosen exactly once, at the moment a project goes live — whether
+// that's straight from potential (Tick) or out of the queue (Promote).
+export async function promoteLive(id, pace, period) {
+  if (!pace) throw new Error('Pick a pace (Rapid Fix, Short, Mid or Long term) to agree this project.');
+  return setStatus(id, 'live', { pace, due: autoTarget(pace, period) });
+}
 export const queueProject = (id) => setStatus(id, 'queued');
 export const pauseProject = (id) => setStatus(id, 'paused');
-export const resumeLive = (id) => setStatus(id, 'live');
-export const moveBackLive = (id) => setStatus(id, 'live');
+export const resumeLive = (id) => setStatus(id, 'live'); // keeps existing pace/due
+export const moveBackLive = (id) => setStatus(id, 'live'); // keeps existing pace/due
 export async function completeProject(id, { what_changed, grade_at_completion }) {
   if (!what_changed) throw new Error('A what-changed note is required to complete a project.');
   return setStatus(id, 'completed', { what_changed, grade_at_completion });
