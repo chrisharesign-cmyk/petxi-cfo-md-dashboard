@@ -43,7 +43,7 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
       await promoteLive(p.id, 'rapid', data.period); setRowError(null);
       setToast(`"${p.title}" is now live as Rapid Fix — find it any time in Excellence Projects.`);
       onRefresh();
-    } catch (e2) { setRowError({ id: p.id, msg: friendlyProjectError(e2, data, p) }); }
+    } catch (e2) { setRowError({ id: p.id, msg: friendlyProjectError(e2) }); }
   };
   const queueForLater = async (p, e) => {
     e.stopPropagation();

@@ -22,11 +22,25 @@ function pickPos(rect) {
   return { x, y };
 }
 
-function ProjectDot({ project, onOpenCase }) {
-  if (!project) return null;
+// A cell can hold more than one open project now — show a plain dot for
+// one, a small count badge for several (opens the first; the rest are in
+// the Excellence Projects list for that area).
+function ProjectDot({ projects, onOpenCase }) {
+  if (!projects?.length) return null;
+  const primary = projects[0];
+  const shapeCls = `${STATUS_CLASS[primary.status]} ${primary.status === 'live' ? 'solid' : primary.status === 'paused' ? 'striped' : 'hollow'}`;
+  if (projects.length === 1) {
+    return (
+      <button className={`pdot ${shapeCls}`}
+        title={`${primary.title} — ${primary.status}`} onClick={(e) => { e.stopPropagation(); onOpenCase(primary.id); }} />
+    );
+  }
   return (
-    <button className={`pdot ${STATUS_CLASS[project.status]} ${project.status === 'live' ? 'solid' : project.status === 'paused' ? 'striped' : 'hollow'}`}
-      title={`${project.title} — ${project.status}`} onClick={(e) => { e.stopPropagation(); onOpenCase(project.id); }} />
+    <button className={`pdot pdot-count ${shapeCls}`}
+      title={`${projects.length} open projects here — click to open "${primary.title}"`}
+      onClick={(e) => { e.stopPropagation(); onOpenCase(primary.id); }}>
+      {projects.length}
+    </button>
   );
 }
 
@@ -41,6 +55,20 @@ function GhostGrade({ project, onOpenCase }) {
       onClick={(e) => { e.stopPropagation(); onOpenCase(project.id); }}>
       {movement.to}
     </button>
+  );
+}
+
+function DotLegend() {
+  return (
+    <div className="card legend-card">
+      <b>Reading the dots:</b> a dot on a score chip means a project's open against that cell —
+      <span className="legend-dot solid" /><b>solid</b> = live,
+      <span className="legend-dot striped" /><b>hatched</b> = on hold,
+      <span className="legend-dot hollow" /><b>hollow</b> = queued or still being discussed.
+      More than one open project shows as a number instead. Click a dot to open the case file.
+      A <b>ghosted number</b> next to a chip is an informal re-read since this SAR locked — a preview
+      of where the grade's heading, ahead of the next official one.
+    </div>
   );
 }
 
@@ -80,7 +108,7 @@ export default function Qip({ data, me, myKey, onScore, canEdit, projectsByCell,
     const { g, snap } = scoreOf(c.id, uid, rk);
     const mine = rk === myKey;
     const clickable = canEdit && mine;
-    const project = projectsByCell[unitCellKey(uid, c.id)];
+    const projects = projectsByCell[unitCellKey(uid, c.id)] || [];
     return (
       <span className="chipwrap">
         <button
@@ -89,14 +117,15 @@ export default function Qip({ data, me, myKey, onScore, canEdit, projectsByCell,
           title={!canEdit && snap ? `Locked — judged against: ${snap}` : clickable ? 'Click to grade' : `${REVIEWERS.find(r => r.key === rk).name}'s score${canEdit ? ' (read-only)' : ''}`}>
           {g || '–'}
         </button>
-        <GhostGrade project={project} onOpenCase={onOpenCase} />
-        <ProjectDot project={project} onOpenCase={onOpenCase} />
+        <GhostGrade project={projects[0]} onOpenCase={onOpenCase} />
+        <ProjectDot projects={projects} onOpenCase={onOpenCase} />
       </span>
     );
   };
 
   return (
     <>
+      <DotLegend />
       <div className="board">
         <table className="matrix">
           <colgroup>
@@ -148,11 +177,7 @@ export default function Qip({ data, me, myKey, onScore, canEdit, projectsByCell,
           ? <>Live — scores save to Supabase as {me}. Headline = mean of all scored cells. You edit only your own column ({REVIEWERS.find(r => r.key === myKey).short}); the other is read-only.</>
           : <>Locked — {period?.label}. Grades are read-only; the wording shown on hover is what was judged against at lock time.</>}
       </p>
-      <p className="footnote">
-        Dot on a chip = a project's open against that cell: ● solid live, ▨ hatched on hold, ○ hollow queued or still
-        being discussed — click it to open the case file. A ghosted number = an informal re-read since this SAR
-        locked, ahead of the next official grade.
-      </p>
+      <DotLegend />
 
       <OrgMatrix data={data} me={me} myKey={myKey} onScore={onScore} canEdit={canEdit}
         projectsByCell={projectsByCell} onOpenArea={onOpenArea} onOpenCase={onOpenCase} />
@@ -226,13 +251,13 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, projectsByCell, onOpenAr
   };
   const Chip = ({ f, c, rk }) => {
     const g = scoreOf(f.id, c.id, rk), mine = rk === myKey, clickable = canEdit && mine;
-    const project = projectsByCell[orgCellKey(f.id, c.id)];
+    const projects = projectsByCell[orgCellKey(f.id, c.id)] || [];
     return (
       <span className="chipwrap">
         <button className={`chip ${g ? ('s' + g) : 'empty'} ${clickable ? '' : 'readonly'}`}
           onClick={clickable ? (e) => open(e, f, c) : undefined}>{g || '–'}</button>
-        <GhostGrade project={project} onOpenCase={onOpenCase} />
-        <ProjectDot project={project} onOpenCase={onOpenCase} />
+        <GhostGrade project={projects[0]} onOpenCase={onOpenCase} />
+        <ProjectDot projects={projects} onOpenCase={onOpenCase} />
       </span>
     );
   };
@@ -241,6 +266,11 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, projectsByCell, onOpenAr
       <div className="panel-h"><span className="bar" style={{ background: 'var(--g2)' }} />Organisation — horizontal functions</div>
       <div className="board">
         <table className="matrix">
+          <colgroup>
+            <col style={{ width: 220 }} />
+            {ocrit.flatMap(c => [<col key={c.id + '-ch'} />, <col key={c.id + '-fs'} />])}
+            <col style={{ width: 90 }} />
+          </colgroup>
           <thead>
             <tr><th className="crit-col" rowSpan={2} />{ocrit.map(c =>
               <th key={c.id} colSpan={2} className="usep" title={critTip(c)}><span className="unit-name">{c.name}</span></th>)}

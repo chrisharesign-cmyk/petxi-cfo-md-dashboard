@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { supa } from './supa';
 import { loadNotes, addNote, editNote, promoteLive, queueProject, pauseProject, resumeLive,
-  moveBackLive, completeProject, cancelProject, updateProjectDue, updateCurrentGrade, loadMeetingsForProject } from './data';
+  moveBackLive, completeProject, cancelProject, updateCurrentGrade, loadMeetingsForProject } from './data';
 import { PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
   friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, gradeMovement } from './util';
 import EditableText from './EditableText';
-import { OwnerEditor, TargetEditor, AreaEditor } from './ProjectControls';
+import { OwnerEditor, ScheduleEditor, AreaEditor } from './ProjectControls';
 import { usePrompt } from './Dialogs';
+import ProjectDocuments from './Documents';
 
 // The official SAR score right now — distinct from project.current_grade,
 // which is the informal, project-linked re-read between formal periods.
@@ -88,7 +89,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   const act = async (fn, ...args) => {
     setBusy(true); setActionError('');
     try { await fn(...args); await load(); onRefresh(); }
-    catch (e) { setActionError(friendlyProjectError(e, data, project)); }
+    catch (e) { setActionError(friendlyProjectError(e)); }
     finally { setBusy(false); }
   };
 
@@ -133,7 +134,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
           <span className="meta-sep">·</span>
           <span>owner <OwnerEditor project={project} data={data} onSaved={onRefresh} /></span>
           <span className="meta-sep">·</span>
-          <span>target <TargetEditor project={project} onSaved={onRefresh} /></span>
+          <span>target <ScheduleEditor project={project} data={data} onSaved={onRefresh} /></span>
         </div>
 
         <div className="casefile-meta" style={{ marginTop: '.3rem' }}>
@@ -211,6 +212,8 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
             ))}
           </div>
         )}
+
+        <ProjectDocuments projectId={project.id} me={me} />
 
         <h4 style={{ marginTop: '1rem' }}>Timeline</h4>
         <div className="feed">

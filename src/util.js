@@ -68,6 +68,23 @@ export function nextPeriod(p) {
   return { id: `FY${String(fy).slice(-2)}Q${q}`, label, starts: start.toISOString().slice(0, 10), ends: end.toISOString().slice(0, 10) };
 }
 
+// Specific future quarters beyond the immediate next one, for scheduling a
+// project against e.g. "Jan–Mar 2027" rather than just the "long term" bucket.
+export function upcomingQuarters(period, count = 8) {
+  const list = [];
+  let p = period;
+  for (let i = 0; i < count; i++) {
+    p = nextPeriod(p);
+    list.push(p);
+  }
+  return list;
+}
+export function quarterLabel(q) {
+  const start = new Date(q.starts + 'T00:00:00'), end = new Date(q.ends + 'T00:00:00');
+  const mon = d => d.toLocaleDateString('en-GB', { month: 'short' });
+  return `${mon(start)}–${mon(end)} ${end.getFullYear()}`;
+}
+
 export function fmtDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso + 'T00:00:00');
@@ -80,15 +97,7 @@ export function overdueBy(iso) {
   return days > 0 ? days : null;
 }
 
-// §4.3 — promoting a second live project on a cell-key must fail gracefully,
-// naming the project that's already live there.
-export function friendlyProjectError(err, data, project) {
-  if (err?.message?.includes('projects_one_live_per_cell')) {
-    const other = data.projects.find(p => p.status === 'live' && p.scope === project.scope &&
-      p.criterion_id === project.criterion_id &&
-      (project.scope === 'unit' ? p.unit_id === project.unit_id : p.function_id === project.function_id));
-    return `${other?.title || 'Another project'} is already live here — pause or complete it first.`;
-  }
+export function friendlyProjectError(err) {
   return err?.message || String(err);
 }
 
@@ -118,11 +127,21 @@ c - [one short, concrete sentence — omit if only 2 actions are genuinely neede
 
 Each action line is ONE sentence. No headings, no bold text, no restating the problem.`;
 
+// Leads with a blatant, all-caps project marker — this gets copied into
+// Claude in one tab and the answer pasted back into a different project's
+// case file in another, so it must be unmistakable which one it's for even
+// after several of these prompts have been fired off in the same session.
 export function buildProjectPrompt(project, data) {
   const crit = critFor(project, data);
-  const desc = crit?.descriptors?.[(project.grade_at_creation || 4) - 1];
-  return `We run a quarterly quality review (1=best/Mastery, 4=worst/Critical) at PET-Xi Training. ` +
-    `"${areaNameFor(project, data)}" scored ${project.grade_at_creation} on "${crit?.name || project.criterion_id}".\n\n` +
+  const graded = project.grade_at_creation != null;
+  const desc = graded ? crit?.descriptors?.[project.grade_at_creation - 1] : null;
+  const context = graded
+    ? `"${areaNameFor(project, data)}" scored ${project.grade_at_creation} on "${crit?.name || project.criterion_id}".\n\n`
+    : `This is a standalone improvement project for "${areaNameFor(project, data)}" — "${crit?.name || project.criterion_id}" — not tied to a specific SAR grade.\n\n`;
+  return `PROJECT: "${project.title}" (${areaNameFor(project, data)}) — paste the answer back into this project's ` +
+    `Plan box in the QIP app when you're done.\n\n` +
+    `We run a quarterly quality review (1=best/Mastery, 4=worst/Critical) at PET-Xi Training. ` +
+    context +
     (desc ? `What a ${project.grade_at_creation} looks like here: ${desc}\n\n` : '') +
     (project.suggested_solution ? `Draft plan so far: ${project.suggested_solution}\n\n` : '') +
     ANSWER_FORMAT;
@@ -138,7 +157,8 @@ export function buildAreaPrompt(scope, id, data) {
     return worst >= 3 ? { name: c.name, grade: worst, desc: c.descriptors?.[worst - 1] } : null;
   }).filter(Boolean);
   if (!bad.length) return `"${areaName}" has no criteria scoring 3 or 4 this period — nothing urgent to explore.`;
-  return `We run a quarterly quality review (1=best/Mastery, 4=worst/Critical) at PET-Xi Training. ` +
+  return `AREA: "${areaName}" — paste the answer back into ${areaName}'s page in the QIP app when you're done.\n\n` +
+    `We run a quarterly quality review (1=best/Mastery, 4=worst/Critical) at PET-Xi Training. ` +
     `"${areaName}" has ${bad.length} criteria scoring 3 or 4 this period:\n\n` +
     bad.map(b => `- ${b.name}: ${b.grade}${b.desc ? ` — ${b.desc}` : ''}`).join('\n') +
     `\n\nLooking at these together, treat it as one connected problem for "${areaName}", not ${bad.length} separate ones.\n\n` +

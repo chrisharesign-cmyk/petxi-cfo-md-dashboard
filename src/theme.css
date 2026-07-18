@@ -60,6 +60,11 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .panel-h{display:flex;align-items:center;gap:.5rem;font-size:.95rem;font-weight:800;margin:1.4rem 0 .6rem}
 .panel-h .bar{width:.35rem;height:1.1rem;border-radius:2px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.4rem;box-shadow:0 1px 3px rgba(23,34,44,.06)}
+.legend-card{font-size:.9rem;line-height:1.7;padding:.9rem 1.2rem;margin-bottom:1rem;border-color:var(--xi);border-width:1.5px}
+.legend-dot{display:inline-block;width:.85rem;height:.85rem;border-radius:50%;margin:0 .3rem 0 .6rem;vertical-align:middle;border:1.5px solid var(--card);box-shadow:0 0 0 1px var(--line)}
+.legend-dot.solid{background:var(--g1)}
+.legend-dot.striped{background:repeating-linear-gradient(45deg,#77607E,#77607E 2px,var(--card) 2px,var(--card) 4px)}
+.legend-dot.hollow{background:var(--card);border:2px solid #614F56}
 .ptable{border-collapse:collapse;width:100%}
 .ptable th{font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);text-align:left;padding:.4rem .6rem;border-bottom:2px solid var(--ink)}
 .ptable td{font-size:.84rem;padding:.55rem .6rem;border-bottom:1px solid var(--line-soft);text-align:left}
@@ -100,6 +105,7 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .pdot.hollow{background:var(--card);border-width:2px}
 .pdot.hollow.st-embed{border-color:#614F56}.pdot.hollow.st-hold{border-color:#77607E}
 .pdot.striped{background:repeating-linear-gradient(45deg,#77607E,#77607E 2px,var(--card) 2px,var(--card) 4px)}
+.pdot-count{width:1.05rem;height:1.05rem;font-size:.52rem;color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;right:-6px;bottom:-6px}
 
 /* ---- ghosted informal re-grade, opposite corner from the pdot ---- */
 .ghostgrade{position:absolute;left:-5px;top:-5px;width:1.1rem;height:1.1rem;border-radius:5px;padding:0;cursor:pointer;
@@ -144,6 +150,7 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .casefile-meta + .casefile-meta{margin-bottom:.8rem}
 .casefile-meta .meta-sep{color:var(--line);opacity:.8}
 .casefile-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:.8rem 0;padding:.8rem;background:var(--paper);border-radius:8px}
+.docrow{display:flex;align-items:center;gap:.4rem;padding:.35rem 0;border-bottom:1px solid var(--line-soft);font-size:.82rem;flex-wrap:wrap}
 
 /* ---- compact status-change menu (table rows) ---- */
 .statusmenu{position:absolute;right:0;top:100%;z-index:40;background:var(--card);border:1px solid var(--line);border-radius:9px;box-shadow:0 10px 24px rgba(23,34,44,.22);padding:.6rem;display:flex;flex-direction:column;gap:.4rem;min-width:170px}

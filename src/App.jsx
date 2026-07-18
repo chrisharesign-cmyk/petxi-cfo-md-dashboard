@@ -114,13 +114,17 @@ function Dashboard({ me, onLeave }) {
     setPeriodId(np.id);
   }
 
+  // A cell can now hold more than one open project (the one-live-per-cell
+  // guard was removed) — collect all of them, best status first, so the
+  // matrix can show a count instead of silently hiding the rest.
   const projectsByCell = {};
   const rank = { live: 0, paused: 1, queued: 2, potential: 3 };
   data.projects.forEach(p => {
     if (!OPEN_STATUSES.includes(p.status)) return;
     const key = projectCellKey(p);
-    if (!projectsByCell[key] || rank[p.status] < rank[projectsByCell[key].status]) projectsByCell[key] = p;
+    (projectsByCell[key] ||= []).push(p);
   });
+  Object.values(projectsByCell).forEach(list => list.sort((a, b) => rank[a.status] - rank[b.status]));
   const potentialCount = data.projects.filter(p => p.status === 'potential').length;
 
   return (
@@ -244,7 +248,7 @@ function BlockerRow({ cell, data, onResolve }) {
         pace: 'rapid', due: autoTarget('rapid', data.period),
       });
       await onResolve();
-    } catch (e) { setError(friendlyProjectError(e, data, { scope: cell.scope, unit_id: cell.unit_id, function_id: cell.function_id, criterion_id: cell.criterion_id })); }
+    } catch (e) { setError(friendlyProjectError(e)); }
     finally { setBusy(false); }
   };
   return (

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { supa, REVIEWERS } from './supa';
 import { promoteLive, queueProject, pauseProject, resumeLive, moveBackLive,
-  completeProject, cancelProject, updateProjectDue } from './data';
-import { PACE_LABEL, PACE_DESC, friendlyProjectError } from './util';
+  completeProject, cancelProject, updateProjectDue, rescheduleProject } from './data';
+import { PACE_LABEL, PACE_DESC, friendlyProjectError, fmtDate, autoTarget, upcomingQuarters, quarterLabel } from './util';
 import { usePrompt } from './Dialogs';
 
 // Owner isn't limited to the two reviewers — anyone (Josh, ops staff, etc.)
@@ -82,7 +82,7 @@ export function AreaEditor({ project, data, onSaved }) {
       : { scope: 'org', unit_id: null, function_id: areaId, criterion_id: criterionId };
     const { error } = await supa.from('projects').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', project.id);
     setBusy(false);
-    if (error) { setError(friendlyProjectError(error, data, { ...project, ...patch })); return; }
+    if (error) { setError(friendlyProjectError(error)); return; }
     setEditing(false);
     onSaved?.();
   };
@@ -129,6 +129,70 @@ export function TargetEditor({ project, onSaved }) {
   );
 }
 
+// Full scheduling control for the case file — same relative tags as agreeing
+// a pace (Quick fix / 2 weeks / This quarter), plus any of the next several
+// specific quarters by name, or a raw custom date. Works at any status, not
+// just at the moment a project first goes live.
+export function ScheduleEditor({ project, data, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [choice, setChoice] = useState('custom');
+  const [customDate, setCustomDate] = useState(project.due || '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const quarters = data.period ? upcomingQuarters(data.period, 8) : [];
+
+  const open = () => {
+    setChoice('custom');
+    setCustomDate(project.due || '');
+    setError('');
+    setEditing(true);
+  };
+
+  const save = async () => {
+    setBusy(true); setError('');
+    try {
+      if (choice === 'custom') {
+        if (!customDate) { setError('Pick a date.'); setBusy(false); return; }
+        await rescheduleProject(project.id, { pace: project.pace, due: customDate });
+      } else if (choice.startsWith('long:')) {
+        const q = quarters[Number(choice.split(':')[1])];
+        await rescheduleProject(project.id, { pace: 'long', due: q.ends });
+      } else {
+        await rescheduleProject(project.id, { pace: choice, due: autoTarget(choice, data.period) });
+      }
+      setEditing(false);
+      onSaved?.();
+    } catch (e) { setError(friendlyProjectError(e)); } finally { setBusy(false); }
+  };
+
+  if (!editing) {
+    return (
+      <span className="editable" onClick={(e) => { e.stopPropagation(); open(); }}>
+        {project.due ? fmtDate(project.due) : <span className="muted">— no target —</span>}
+        {project.pace && <span className="muted"> ({PACE_LABEL[project.pace]})</span>}
+      </span>
+    );
+  }
+  return (
+    <span className="editform" onClick={e => e.stopPropagation()} style={{ flexWrap: 'wrap' }}>
+      <select className="formctl" value={choice} onChange={e => setChoice(e.target.value)}>
+        <option value="rapid">Quick fix — coming Friday</option>
+        <option value="short">2 weeks out</option>
+        <option value="mid">This quarter{data.period ? ` — by ${fmtDate(data.period.ends)}` : ''}</option>
+        {quarters.map((q, i) => <option key={i} value={`long:${i}`}>{quarterLabel(q)}</option>)}
+        <option value="custom">Custom date…</option>
+      </select>
+      {choice === 'custom' && (
+        <input type="date" className="formctl" value={customDate} onChange={e => setCustomDate(e.target.value)} />
+      )}
+      <button onClick={save} disabled={busy}>Save</button>
+      <button type="button" onClick={() => setEditing(false)}>Cancel</button>
+      {error && <span className="muted" style={{ color: 'var(--g4)', display: 'block', width: '100%' }}>{error}</span>}
+    </span>
+  );
+}
+
 // Compact version of the case file's status actions, for editing straight
 // from a table row without opening the case file. Same guarded functions —
 // completing still requires a note, cancelling still requires a reason.
@@ -141,7 +205,7 @@ export function StatusMenu({ project, data, onSaved }) {
   const run = async (fn, ...args) => {
     setError('');
     try { await fn(...args); setOpen(false); onSaved?.(); }
-    catch (e) { setError(friendlyProjectError(e, data, project)); }
+    catch (e) { setError(friendlyProjectError(e)); }
   };
   const complete = async () => {
     const what = await askText('What changed? Required to mark this complete.', { confirmLabel: 'Complete' });

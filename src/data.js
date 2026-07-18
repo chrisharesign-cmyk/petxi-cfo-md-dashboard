@@ -203,9 +203,17 @@ async function setStatus(id, status, extra = {}) {
 }
 // Pace is chosen exactly once, at the moment a project goes live — whether
 // that's straight from potential (Tick) or out of the queue (Promote).
-export async function promoteLive(id, pace, period) {
+// dueOverride lets a specific future quarter be picked instead of the
+// generic "long term = next period" default.
+export async function promoteLive(id, pace, period, dueOverride) {
   if (!pace) throw new Error('Pick a pace (Rapid Fix, Short, Mid or Long term) to agree this project.');
-  return setStatus(id, 'live', { pace, due: autoTarget(pace, period) });
+  return setStatus(id, 'live', { pace, due: dueOverride || autoTarget(pace, period) });
+}
+// Re-target a project's schedule at any status, not just at the moment it
+// first goes live — e.g. moving a paused project out to a named future quarter.
+export async function rescheduleProject(id, { pace, due }) {
+  const { error } = await supa.from('projects').update({ pace, due, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
 }
 export const queueProject = (id) => setStatus(id, 'queued');
 export const pauseProject = (id) => setStatus(id, 'paused');
@@ -303,6 +311,32 @@ export async function loadMeetingsForProject(projectId) {
     .eq('project_id', projectId).not('ended_at', 'is', null).order('started_at', { ascending: false });
   if (error) throw error;
   return data;
+}
+
+// ---- project documents: PDF attachments, on any project ----
+export async function loadDocuments(projectId) {
+  const { data, error } = await supa.from('project_documents').select('*')
+    .eq('project_id', projectId).order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+export async function uploadDocument(projectId, file, uploadedBy) {
+  const path = `${projectId}/${Date.now()}-${file.name}`;
+  const { error: upErr } = await supa.storage.from('project-docs').upload(path, file, { contentType: file.type || 'application/pdf' });
+  if (upErr) throw upErr;
+  const { error } = await supa.from('project_documents').insert({
+    project_id: projectId, filename: file.name, storage_path: path,
+    uploaded_by: uploadedBy, mime_type: file.type || 'application/pdf', size_bytes: file.size,
+  });
+  if (error) throw error;
+}
+export function documentUrl(storage_path) {
+  return supa.storage.from('project-docs').getPublicUrl(storage_path).data.publicUrl;
+}
+export async function deleteDocument(doc) {
+  await supa.storage.from('project-docs').remove([doc.storage_path]);
+  const { error } = await supa.from('project_documents').delete().eq('id', doc.id);
+  if (error) throw error;
 }
 
 // Org-wide mean, by period, across every unit and org-function score —
