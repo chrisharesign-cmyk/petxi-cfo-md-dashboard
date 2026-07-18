@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supa, REVIEWERS } from './supa';
-import { promoteLive, queueProject, pauseProject, resumeLive, moveBackLive,
+import { promoteLive, pauseProject, resumeLive, moveBackLive,
   completeProject, cancelProject, updateProjectDue, rescheduleProject } from './data';
 import { PACE_LABEL, PACE_DESC, friendlyProjectError, fmtDate, autoTarget, upcomingQuarters, quarterLabel } from './util';
 import { usePrompt } from './Dialogs';
@@ -199,14 +199,17 @@ export function ScheduleEditor({ project, data, onSaved }) {
 export function StatusMenu({ project, data, onSaved }) {
   const [open, setOpen] = useState(false);
   const [pace, setPace] = useState('rapid');
+  const [owner, setOwner] = useState(project.owner || '');
   const [error, setError] = useState('');
   const [askText, textDialog] = usePrompt();
+  const knownOwners = [...new Set([...REVIEWERS.map(r => r.name), ...data.projects.map(p => p.owner).filter(Boolean)])];
 
   const run = async (fn, ...args) => {
     setError('');
     try { await fn(...args); setOpen(false); onSaved?.(); }
     catch (e) { setError(friendlyProjectError(e)); }
   };
+  const agree = () => run(promoteLive, project.id, pace, data.period, { owner: owner.trim() });
   const complete = async () => {
     const what = await askText('What changed? Required to mark this complete.', { confirmLabel: 'Complete' });
     if (!what) return;
@@ -228,18 +231,14 @@ export function StatusMenu({ project, data, onSaved }) {
       {open && (
         <div className="statusmenu">
           {error && <p className="muted" style={{ color: 'var(--g4)' }}>{error}</p>}
-          {project.status === 'potential' && <>
+          {(project.status === 'potential' || project.status === 'queued') && <>
             <select className="formctl" value={pace} onChange={e => setPace(e.target.value)}>
               {['rapid', 'short', 'mid', 'long'].map(p => <option key={p} value={p}>{PACE_LABEL[p]}</option>)}
             </select>
-            <button onClick={() => run(promoteLive, project.id, pace, data.period)}>Agree</button>
-            <button onClick={() => run(queueProject, project.id)}>Queue for later</button>
-          </>}
-          {project.status === 'queued' && <>
-            <select className="formctl" value={pace} onChange={e => setPace(e.target.value)}>
-              {['rapid', 'short', 'mid', 'long'].map(p => <option key={p} value={p}>{PACE_LABEL[p]}</option>)}
-            </select>
-            <button onClick={() => run(promoteLive, project.id, pace, data.period)}>Agree</button>
+            <input className="formctl" list={`sm-owners-${project.id}`} placeholder="owner (required)"
+              value={owner} onChange={e => setOwner(e.target.value)} />
+            <datalist id={`sm-owners-${project.id}`}>{knownOwners.map(n => <option key={n} value={n} />)}</datalist>
+            <button disabled={!owner.trim()} onClick={agree}>Agree</button>
           </>}
           {project.status === 'live' && <>
             <button onClick={() => run(pauseProject, project.id)}>Pause</button>

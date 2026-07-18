@@ -202,12 +202,15 @@ async function setStatus(id, status, extra = {}) {
   if (error) throw error;
 }
 // Pace is chosen exactly once, at the moment a project goes live — whether
-// that's straight from potential (Tick) or out of the queue (Promote).
-// dueOverride lets a specific future quarter be picked instead of the
-// generic "long term = next period" default.
-export async function promoteLive(id, pace, period, dueOverride) {
+// that's straight from To discuss (Tick) or out of the queue (Promote).
+// due lets a specific future quarter be picked instead of the generic
+// "long term = next period" default. owner is required going forward —
+// anything leaving To discuss gets a date and an owner in the same step.
+export async function promoteLive(id, pace, period, { due, owner } = {}) {
   if (!pace) throw new Error('Pick a pace (Rapid Fix, Short, Mid or Long term) to agree this project.');
-  return setStatus(id, 'live', { pace, due: dueOverride || autoTarget(pace, period) });
+  const extra = { pace, due: due || autoTarget(pace, period) };
+  if (owner !== undefined) extra.owner = owner;
+  return setStatus(id, 'live', extra);
 }
 // Re-target a project's schedule at any status, not just at the moment it
 // first goes live — e.g. moving a paused project out to a named future quarter.
@@ -215,7 +218,6 @@ export async function rescheduleProject(id, { pace, due }) {
   const { error } = await supa.from('projects').update({ pace, due, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) throw error;
 }
-export const queueProject = (id) => setStatus(id, 'queued');
 export const pauseProject = (id) => setStatus(id, 'paused');
 export const resumeLive = (id) => setStatus(id, 'live'); // keeps existing pace/due
 export const moveBackLive = (id) => setStatus(id, 'live'); // keeps existing pace/due

@@ -26,9 +26,12 @@ export function useConfirm() {
 }
 
 export function usePrompt() {
-  const [state, setState] = useState(null); // { message, danger, confirmLabel, placeholder, value, resolve }
+  const [state, setState] = useState(null); // { message, danger, confirmLabel, placeholder, suggestions, value, resolve }
   const ask = (message, opts = {}) => new Promise(resolve => {
-    setState({ message, danger: !!opts.danger, confirmLabel: opts.confirmLabel || 'Save', placeholder: opts.placeholder || '', value: '', resolve });
+    setState({
+      message, danger: !!opts.danger, confirmLabel: opts.confirmLabel || 'Save',
+      placeholder: opts.placeholder || '', suggestions: opts.suggestions || null, value: '', resolve,
+    });
   });
   const close = (result) => { state?.resolve(result); setState(null); };
   const submit = () => close(state.value.trim() || null);
@@ -37,9 +40,13 @@ export function usePrompt() {
       <div className="modal" onClick={e => e.stopPropagation()}>
         <p>{state.message}</p>
         <input className="formctl" autoFocus placeholder={state.placeholder} value={state.value}
+          list={state.suggestions ? 'prompt-suggestions' : undefined}
           onChange={e => setState(s => ({ ...s, value: e.target.value }))}
           onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') close(null); }}
           style={{ width: '100%', margin: '.8rem 0' }} />
+        {state.suggestions && (
+          <datalist id="prompt-suggestions">{state.suggestions.map(s => <option key={s} value={s} />)}</datalist>
+        )}
         <div className="modal-actions">
           <button onClick={() => close(null)}>Cancel</button>
           <button className={state.danger ? 'danger' : ''} onClick={submit}>{state.confirmLabel}</button>

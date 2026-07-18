@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supa } from './supa';
-import { loadNotes, addNote, editNote, promoteLive, queueProject, pauseProject, resumeLive,
+import { supa, REVIEWERS } from './supa';
+import { loadNotes, addNote, editNote, promoteLive, pauseProject, resumeLive,
   moveBackLive, completeProject, cancelProject, updateCurrentGrade, loadMeetingsForProject } from './data';
 import { PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
   friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, gradeMovement } from './util';
@@ -18,14 +18,23 @@ function officialCurrentGrade(p, data) {
   return rows.length ? Math.max(...rows.map(r => r.score)) : null;
 }
 
+// Anything leaving To discuss gets a date (from pace) and an owner, in the
+// same step — no more "queue for later, decide details another day".
 function AgreePace({ project, data, act }) {
   const [pace, setPace] = useState('rapid');
+  const [owner, setOwner] = useState(project.owner || '');
+  const known = [...new Set([...REVIEWERS.map(r => r.name), ...data.projects.map(p => p.owner).filter(Boolean)])];
+  const canAgree = owner.trim().length > 0;
   return (
-    <span style={{ display: 'inline-flex', gap: '.4rem', alignItems: 'center' }}>
+    <span style={{ display: 'inline-flex', gap: '.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
       <select className="formctl" value={pace} onChange={e => setPace(e.target.value)}>
         {['rapid', 'short', 'mid', 'long'].map(p => <option key={p} value={p}>{PACE_LABEL[p]} — {PACE_DESC[p]}</option>)}
       </select>
-      <button className="btn primary" onClick={() => act(promoteLive, project.id, pace, data.period)}>Agree</button>
+      <input className="formctl" list={`agree-owners-${project.id}`} placeholder="owner (required)"
+        value={owner} onChange={e => setOwner(e.target.value)} style={{ width: 160 }} />
+      <datalist id={`agree-owners-${project.id}`}>{known.map(n => <option key={n} value={n} />)}</datalist>
+      <button className="btn primary" disabled={!canAgree}
+        onClick={() => act(promoteLive, project.id, pace, data.period, { owner: owner.trim() })}>Agree</button>
     </span>
   );
 }
@@ -162,10 +171,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
         </div>
 
         <div className="casefile-actions">
-          {project.status === 'potential' && <>
-            <AgreePace project={project} data={data} act={act} />
-            <button className="btn" disabled={busy} onClick={() => act(queueProject, project.id)}>Queue for later</button>
-          </>}
+          {project.status === 'potential' && <AgreePace project={project} data={data} act={act} />}
           {project.status === 'queued' && <AgreePace project={project} data={data} act={act} />}
           {project.status === 'live' && <>
             <button className="btn" disabled={busy} onClick={() => act(pauseProject, project.id)}>Pause</button>

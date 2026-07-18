@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { promoteLive, queueProject } from './data';
+import { REVIEWERS } from './supa';
+import { promoteLive } from './data';
 import { overdueBy, friendlyProjectError, daysInStage } from './util';
+import { usePrompt } from './Dialogs';
 
 const INITIAL_SHOWN = 8;
 const AGING_POTENTIAL_DAYS = 14;
@@ -27,29 +29,32 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
   const [toast, setToast] = useState('');
   const [showAll, setShowAll] = useState(false);
   const [sortKey, setSortKey] = useState('Worst grade first');
+  const [askOwner, ownerDialog] = usePrompt();
   const potentials = data.projects
     .filter(p => p.status === 'potential')
     .sort(SORTS[sortKey]);
   const shown = showAll ? potentials : potentials.slice(0, INITIAL_SHOWN);
-  const waiting = data.projects.filter(p => p.status === 'queued');
+  const waiting = data.projects.filter(p => p.status === 'queued'); // legacy — nothing new can enter this status
   const overdue = data.projects.filter(p => p.due && overdueBy(p.due) && ['live', 'paused'].includes(p.status));
+  const knownOwners = [...new Set([...REVIEWERS.map(r => r.name), ...data.projects.map(p => p.owner).filter(Boolean)])];
 
   // The default habit is Rapid Fix, one click. Anything else (Short/Mid/
   // Long term) is picked from the case file, which is why the row itself
   // is clickable — this is the fix for "clicking a project shows nothing".
+  // Nothing leaves To discuss without an owner and a date any more — if
+  // one isn't already set, this asks before agreeing.
   const tick = async (p, e) => {
     e.stopPropagation();
     try {
-      await promoteLive(p.id, 'rapid', data.period); setRowError(null);
-      setToast(`"${p.title}" is now live as Rapid Fix — find it any time in Excellence Projects.`);
+      let owner = p.owner;
+      if (!owner) {
+        owner = await askOwner(`Who owns "${p.title}"? Required to agree it.`, { suggestions: knownOwners, confirmLabel: 'Agree' });
+        if (!owner) return;
+      }
+      await promoteLive(p.id, 'rapid', data.period, { owner }); setRowError(null);
+      setToast(`"${p.title}" is now live as Rapid Fix, owned by ${owner} — find it any time in Excellence Projects.`);
       onRefresh();
     } catch (e2) { setRowError({ id: p.id, msg: friendlyProjectError(e2) }); }
-  };
-  const queueForLater = async (p, e) => {
-    e.stopPropagation();
-    await queueProject(p.id);
-    setToast(`"${p.title}" moved to Excellence Projects, queued — it'll wait there until you promote it to live.`);
-    onRefresh();
   };
 
   return (
@@ -68,8 +73,8 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
       <p className="muted" style={{ marginBottom: '.8rem' }}>
         Click a project to open it — that's where the plan lives, and where you can assign an owner or agree a
         different pace (Short, Mid or Long term instead of the Rapid Fix default). <b>Agree — Rapid Fix</b> here is
-        the one-click shortcut for the common case; <b>Queue for later</b> holds it without starting it yet. Either way it leaves this
-        list and moves to the{' '}
+        the one-click shortcut for the common case — it'll ask who owns it if that isn't set yet, since nothing
+        leaves this list without an owner and a date. It moves to the{' '}
         {onGoToProjects ? <button className="linklike" onClick={onGoToProjects}>Excellence Projects</button> : 'Excellence Projects'} tab, it isn't deleted.
       </p>
       {toast && <div className="card" style={{ marginBottom: '.8rem', borderColor: 'var(--g2)' }}>{toast}</div>}
@@ -90,7 +95,6 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
             </div>
             <div style={{ display: 'flex', gap: '.4rem' }}>
               <button onClick={(e) => tick(p, e)} title="Agree this as-is and start it immediately">Agree — Rapid Fix</button>
-              <button onClick={(e) => queueForLater(p, e)} title="Queue it for later, without starting it yet">Queue for later</button>
             </div>
           </div>
           );
@@ -104,11 +108,13 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
 
       {(waiting.length > 0 || overdue.length > 0) && (
         <div className="card" style={{ marginTop: '1rem' }}>
-          {waiting.length > 0 && <p><b>{waiting.length}</b> queued, waiting for a live slot to free up
-            {onGoToProjects && <> — <button className="linklike" onClick={onGoToProjects}>view them</button></>}.</p>}
+          {waiting.length > 0 && <p><b>{waiting.length}</b> left over from before Queued was retired — still need
+            an owner and a date to go live
+            {onGoToProjects && <> — <button className="linklike" onClick={onGoToProjects}>resolve them</button></>}.</p>}
           {overdue.length > 0 && <p><b>{overdue.length}</b> overdue: {overdue.map(p => p.title).join(', ')}</p>}
         </div>
       )}
+      {ownerDialog}
     </>
   );
 }
