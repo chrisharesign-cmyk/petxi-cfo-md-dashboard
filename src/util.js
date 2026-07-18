@@ -1,7 +1,7 @@
 // Shared helpers used across the QIP screens.
 
 export const STATUS_LABEL = {
-  potential: 'Potential', queued: 'Queued', live: 'Live',
+  potential: 'To discuss', queued: 'Queued', live: 'Live',
   paused: 'On Hold', completed: 'Completed', cancelled: 'Cancelled',
 };
 export const STATUS_CLASS = {
