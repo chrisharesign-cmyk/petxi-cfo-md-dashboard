@@ -1,11 +1,20 @@
 import { useState } from 'react';
 import { addProject } from './data';
-import { STATUS_LABEL, statusBadge, statusSortKey, fmtDate, overdueBy, daysInStage, isOverStageLimit, gradeMovement } from './util';
+import { STATUS_LABEL, PACE_LABEL, statusBadge, statusSortKey, fmtDate, overdueBy, daysInStage, isOverStageLimit, gradeMovement } from './util';
 import { OwnerEditor, ImpactEditor, TargetEditor, StatusMenu } from './ProjectControls';
 import EditableText from './EditableText';
 
 const RAG = { G: '#97D700', A: '#E8A317', R: '#D0342C' };
-const STATUSES = ['potential', 'queued', 'live', 'paused', 'completed', 'cancelled'];
+// Not-yet-live / no-longer-open statuses — filterable directly by status.
+const STATUSES = ['potential', 'queued', 'paused', 'completed', 'cancelled'];
+// "Live" itself never appears as visible text anywhere (every live project
+// shows its pace instead — Rapid Fix / Short & mid-term / Long term) — so
+// filter on pace here too, rather than on a "Live" label nothing displays.
+const PACES = [
+  { key: 'pace:rapid', label: 'Rapid Fix', test: p => p.status === 'live' && p.pace === 'rapid' },
+  { key: 'pace:shortmid', label: PACE_LABEL.short, test: p => p.status === 'live' && ['short', 'mid'].includes(p.pace) },
+  { key: 'pace:long', label: 'Long term', test: p => p.status === 'live' && p.pace === 'long' },
+];
 
 const COLUMNS = [
   { key: 'title', label: 'Project' },
@@ -13,13 +22,13 @@ const COLUMNS = [
   { key: 'owner', label: 'Owner' },
   { key: 'status', label: 'Status' },
   { key: 'sar', label: 'SAR' },
-  { key: 'current', label: 'Current' },
+  { key: 'current', label: 'Current read' },
   { key: 'impact', label: 'Impact' },
   { key: 'stage', label: 'At stage' },
   { key: 'target', label: 'Target' },
   { key: 'blocker', label: 'Blocker' },
   { key: 'created', label: 'Added' },
-  { key: 'updated', label: 'Updated' },
+  { key: 'updated', label: 'Last edited' },
 ];
 const IMPACT_RANK = { G: 0, A: 1, R: 2 };
 function sortValue(p, data, key) {
@@ -63,6 +72,8 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
     if (!filters.size) return true;
     for (const f of filters) {
       if (STATUSES.includes(f) && p.status === f) return true;
+      const pace = PACES.find(pc => pc.key === f);
+      if (pace && pace.test(p)) return true;
       if (f === 'Overdue' && p.due && overdueBy(p.due) && !['completed', 'cancelled'].includes(p.status)) return true;
       if (f === 'New this period' && periodStart && new Date(p.created_at) >= periodStart) return true;
       if (f === 'Mine' && p.owner === me) return true;
@@ -89,9 +100,19 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
       </p>
 
       <div className="fchips">
-        {[...STATUSES, 'Overdue', 'New this period', 'Mine', 'Improved', 'Slipped'].map(f => (
+        {STATUSES.map(f => (
           <button key={f} className={`fchip ${filters.has(f) ? 'active' : ''}`} onClick={() => toggle(f)}>
-            {STATUS_LABEL[f] || f}
+            {STATUS_LABEL[f]}
+          </button>
+        ))}
+        {PACES.map(pc => (
+          <button key={pc.key} className={`fchip ${filters.has(pc.key) ? 'active' : ''}`} onClick={() => toggle(pc.key)}>
+            {pc.label}
+          </button>
+        ))}
+        {['Overdue', 'New this period', 'Mine', 'Improved', 'Slipped'].map(f => (
+          <button key={f} className={`fchip ${filters.has(f) ? 'active' : ''}`} onClick={() => toggle(f)}>
+            {f}
           </button>
         ))}
       </div>
