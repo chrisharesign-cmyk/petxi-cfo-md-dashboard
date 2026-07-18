@@ -8,6 +8,7 @@ import EditableText from './EditableText';
 import { OwnerEditor, ScheduleEditor, AreaEditor } from './ProjectControls';
 import { usePrompt } from './Dialogs';
 import ProjectDocuments from './Documents';
+import ProjectLinks from './ProjectLinks';
 
 // The official SAR score right now — distinct from project.current_grade,
 // which is the informal, project-linked re-read between formal periods.
@@ -218,6 +219,8 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
             ))}
           </div>
         )}
+
+        <ProjectLinks project={project} me={me} data={data} />
 
         <ProjectDocuments projectId={project.id} me={me} />
 

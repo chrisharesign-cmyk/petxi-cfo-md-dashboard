@@ -18,7 +18,7 @@ export async function loadPeriods() {
 
 // Load the whole matrix structure + one period's scores/projects in one go.
 export async function loadAll(periodId) {
-  const [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods] = await Promise.all([
+  const [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods, projectLinks] = await Promise.all([
     supa.from('units').select('*').order('sort'),
     supa.from('criteria').select('*').order('sort'),
     supa.from('org_functions').select('*').order('sort'),
@@ -27,8 +27,9 @@ export async function loadAll(periodId) {
     supa.from('org_scores').select('*').eq('period_id', periodId),
     supa.from('projects').select('*').order('created_at', { ascending: false }),
     supa.from('sar_periods').select('*').order('starts'),
+    supa.from('project_links').select('*'),
   ]);
-  const err = [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods].find(r => r.error);
+  const err = [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods, projectLinks].find(r => r.error);
   if (err) throw err.error;
   const period = periods.data.find(p => p.id === periodId);
   return {
@@ -36,6 +37,7 @@ export async function loadAll(periodId) {
     ofuncs: ofuncs.data, ocrit: ocrit.data,
     scores: scores.data, oscores: oscores.data,
     projects: projects.data, periods: periods.data, period,
+    projectLinks: projectLinks.data,
   };
 }
 
@@ -313,6 +315,26 @@ export async function loadMeetingsForProject(projectId) {
     .eq('project_id', projectId).not('ended_at', 'is', null).order('started_at', { ascending: false });
   if (error) throw error;
   return data;
+}
+
+// ---- project links: "also affects" tags beyond a project's primary home ----
+export async function loadProjectLinks(projectId) {
+  const { data, error } = await supa.from('project_links').select('*').eq('project_id', projectId);
+  if (error) throw error;
+  return data;
+}
+export async function addProjectLink(projectId, { scope, unit_id, function_id, criterion_id }, createdBy) {
+  const { error } = await supa.from('project_links').insert({
+    project_id: projectId, scope,
+    unit_id: scope === 'unit' ? unit_id : null,
+    function_id: scope === 'org' ? function_id : null,
+    criterion_id, created_by: createdBy,
+  });
+  if (error) throw error;
+}
+export async function removeProjectLink(id) {
+  const { error } = await supa.from('project_links').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ---- project documents: PDF attachments, on any project ----

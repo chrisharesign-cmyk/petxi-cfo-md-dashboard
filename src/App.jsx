@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import './theme.css';
 import { supa, REVIEWERS } from './supa';
-import { loadAll, lockPeriod, spoolProjects, addProject, promoteLive, projectCellKey, OPEN_STATUSES } from './data';
+import { loadAll, lockPeriod, spoolProjects, addProject, promoteLive, projectCellKey, unitCellKey, orgCellKey, OPEN_STATUSES } from './data';
 import { nextPeriod, friendlyProjectError, autoTarget } from './util';
 import Qip from './Qip';
 import ProjectsTab from './Projects';
@@ -116,13 +116,21 @@ function Dashboard({ me, onLeave }) {
 
   // A cell can now hold more than one open project (the one-live-per-cell
   // guard was removed) — collect all of them, best status first, so the
-  // matrix can show a count instead of silently hiding the rest.
+  // matrix can show a count instead of silently hiding the rest. A project
+  // also shows up on any extra area it's tagged as "also affecting" via
+  // project_links, not just its primary home.
   const projectsByCell = {};
   const rank = { live: 0, paused: 1, queued: 2, potential: 3 };
+  const addToCell = (key, p) => { (projectsByCell[key] ||= []).push(p); };
   data.projects.forEach(p => {
     if (!OPEN_STATUSES.includes(p.status)) return;
-    const key = projectCellKey(p);
-    (projectsByCell[key] ||= []).push(p);
+    addToCell(projectCellKey(p), p);
+  });
+  (data.projectLinks || []).forEach(link => {
+    const p = data.projects.find(pr => pr.id === link.project_id);
+    if (!p || !OPEN_STATUSES.includes(p.status)) return;
+    const key = link.scope === 'unit' ? unitCellKey(link.unit_id, link.criterion_id) : orgCellKey(link.function_id, link.criterion_id);
+    addToCell(key, p);
   });
   Object.values(projectsByCell).forEach(list => list.sort((a, b) => rank[a.status] - rank[b.status]));
   const potentialCount = data.projects.filter(p => p.status === 'potential').length;
