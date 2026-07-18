@@ -1,0 +1,156 @@
+import { useState } from 'react';
+import { addProject } from './data';
+import { STATUS_LABEL, STATUS_CLASS, autoTarget, fmtDate, overdueBy } from './util';
+
+const RAG = { G: '#97D700', A: '#E8A317', R: '#D0342C' };
+const STATUSES = ['potential', 'queued', 'live', 'paused', 'completed', 'cancelled'];
+
+function areaName(p, data) {
+  return p.scope === 'unit'
+    ? data.units.find(u => u.id === p.unit_id)?.name
+    : data.ofuncs.find(f => f.id === p.function_id)?.name;
+}
+function critName(p, data) {
+  return p.scope === 'unit'
+    ? data.criteria.find(c => c.id === p.criterion_id)?.name
+    : data.ocrit.find(c => c.id === p.criterion_id)?.name;
+}
+
+export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
+  const [filters, setFilters] = useState(new Set());
+  const [showAdd, setShowAdd] = useState(false);
+  const toggle = f => setFilters(s => { const n = new Set(s); n.has(f) ? n.delete(f) : n.add(f); return n; });
+
+  const periodStart = data.period ? new Date(data.period.starts) : null;
+  const rows = data.projects.filter(p => {
+    if (!filters.size) return true;
+    for (const f of filters) {
+      if (STATUSES.includes(f) && p.status === f) return true;
+      if (f === 'Overdue' && p.due && overdueBy(p.due) && !['completed', 'cancelled'].includes(p.status)) return true;
+      if (f === 'New this period' && periodStart && new Date(p.created_at) >= periodStart) return true;
+    }
+    return false;
+  });
+
+  return (
+    <>
+      <div className="panel-h" style={{ justifyContent: 'space-between', display: 'flex' }}>
+        <span><span className="bar" style={{ background: 'var(--g1)' }} />Excellence Projects List — {data.projects.length} projects</span>
+        <button onClick={() => setShowAdd(s => !s)}>{showAdd ? 'Cancel' : '+ Add project'}</button>
+      </div>
+
+      <div className="fchips">
+        {[...STATUSES, 'Overdue', 'New this period'].map(f => (
+          <button key={f} className={`fchip ${filters.has(f) ? 'active' : ''}`} onClick={() => toggle(f)}>
+            {STATUS_LABEL[f] || f}
+          </button>
+        ))}
+      </div>
+
+      {showAdd && <AddProjectForm data={data} me={me} onDone={() => { setShowAdd(false); onRefresh(); }} />}
+
+      <div className="card">
+        <table className="ptable">
+          <thead>
+            <tr>
+              <th>Project</th><th>Area</th><th>Owner</th><th>Status</th>
+              <th>Impact of fix</th><th>Target</th><th>Blocker</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(p => {
+              const isNew = periodStart && new Date(p.created_at) >= periodStart;
+              const overdue = p.due && overdueBy(p.due) && !['completed', 'cancelled'].includes(p.status);
+              return (
+                <tr key={p.id} onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>
+                  <td>{p.title}{isNew && <span className="newtag">NEW</span>}</td>
+                  <td>{areaName(p, data)} &gt; {critName(p, data)}</td>
+                  <td>{p.owner || '—'}</td>
+                  <td><span className={`st ${STATUS_CLASS[p.status]}`}>{STATUS_LABEL[p.status]}</span></td>
+                  <td>{p.impact ? <span className="rag" style={{ background: RAG[p.impact] }} title={p.impact} /> : '—'}</td>
+                  <td>{fmtDate(p.due)}{overdue && <span className="overdue"> {overdueBy(p.due)}d overdue</span>}</td>
+                  <td>{p.blocked_by || '—'}</td>
+                </tr>
+              );
+            })}
+            {!rows.length && <tr><td colSpan={7} className="muted">No projects match this filter.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function AddProjectForm({ data, me, onDone }) {
+  const [scope, setScope] = useState('unit');
+  const [areaId, setAreaId] = useState('');
+  const [criterionId, setCriterionId] = useState('');
+  const [title, setTitle] = useState('');
+  const [owner, setOwner] = useState(me);
+  const [impact, setImpact] = useState('A');
+  const [pace, setPace] = useState('short');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const critOptions = scope === 'unit'
+    ? data.criteria.filter(c => !c.unit_id || c.unit_id === areaId)
+    : data.ocrit;
+
+  const submit = async e => {
+    e.preventDefault();
+    if (!areaId || !criterionId || !title) { setError('Area, criterion and title are required.'); return; }
+    setBusy(true); setError('');
+    try {
+      await addProject({
+        title, scope, owner,
+        unit_id: scope === 'unit' ? areaId : null,
+        function_id: scope === 'org' ? areaId : null,
+        criterion_id: criterionId,
+        status: 'queued',
+        impact,
+        due: autoTarget(pace),
+      });
+      onDone();
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <form className="card" onSubmit={submit} style={{ marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.6rem' }}>
+        <select value={scope} onChange={e => { setScope(e.target.value); setAreaId(''); setCriterionId(''); }}>
+          <option value="unit">Business unit</option>
+          <option value="org">Org function</option>
+        </select>
+        <select value={areaId} onChange={e => { setAreaId(e.target.value); setCriterionId(''); }} required>
+          <option value="">— area —</option>
+          {(scope === 'unit' ? data.units : data.ofuncs).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <select value={criterionId} onChange={e => setCriterionId(e.target.value)} required disabled={!areaId}>
+          <option value="">— criterion —</option>
+          {critOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+      <input placeholder="Project title" value={title} onChange={e => setTitle(e.target.value)}
+        style={{ width: '100%', marginBottom: '.6rem', padding: '.4rem' }} required />
+      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.6rem' }}>
+        <select value={owner} onChange={e => setOwner(e.target.value)}>
+          <option value="Chris Haresign">Chris Haresign</option>
+          <option value="Fleur Sexton">Fleur Sexton</option>
+        </select>
+        <select value={impact} onChange={e => setImpact(e.target.value)}>
+          <option value="G">Impact: high (G)</option>
+          <option value="A">Impact: medium (A)</option>
+          <option value="R">Impact: low (R)</option>
+        </select>
+        <select value={pace} onChange={e => setPace(e.target.value)}>
+          <option value="rapid">Rapid — target: coming Friday</option>
+          <option value="short">Short — target: +1 month</option>
+          <option value="mid">Mid — target: 31 Aug</option>
+          <option value="long">Long — target: 31 Dec</option>
+        </select>
+      </div>
+      {error && <p className="muted" style={{ color: 'var(--g4)' }}>{error}</p>}
+      <button disabled={busy}>Add — starts queued</button>
+    </form>
+  );
+}

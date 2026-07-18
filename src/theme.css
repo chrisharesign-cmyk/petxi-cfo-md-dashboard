@@ -2,7 +2,6 @@
   --ink:#17222c; --ink-soft:#41505c; --paper:#f5f4ef; --card:#fff;
   --line:#ddd9cf; --line-soft:#eceadf; --xi:#D51A80;
   --g1:#D51A80; --g2:#44AFA1; --g3:#77607E; --g4:#A3393F; --icu:#7c2a30;
-  --m-m1:#D51A80; --m-m2:#44AFA1; --m-grey:#8D8C86; --m-brown:#8B5A2B; --m-m4:#A3393F;
   --mono:'IBM Plex Mono',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -27,14 +26,15 @@ nav.tabs button{font-weight:600;font-size:.82rem;color:#8b959e;background:none;b
 nav.tabs button.active{color:#f2f0e8;border-bottom-color:var(--xi)}
 .wrap{max-width:1280px;margin:1.5rem auto 4rem;padding:0 1.2rem}
 .board{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto;box-shadow:0 1px 3px rgba(23,34,44,.06)}
-table.matrix{border-collapse:separate;border-spacing:0;width:100%;min-width:1060px}
+table.matrix{border-collapse:separate;border-spacing:0;width:100%;min-width:1060px;table-layout:fixed}
 .matrix th,.matrix td{padding:.42rem .3rem;text-align:center;border-bottom:1px solid var(--line-soft)}
 .matrix thead th{background:var(--card);position:sticky;z-index:3;vertical-align:bottom}
 .matrix thead tr:first-child th{top:0}
 .crit-col{text-align:left;min-width:215px;position:sticky;left:0;background:var(--card);z-index:4}
 .matrix td.crit{text-align:left;font-size:.83rem;font-weight:500;position:sticky;left:0;background:var(--card);z-index:2;border-right:1px solid var(--line-soft);padding-left:.6rem;cursor:help}
 .usep{border-right:1px solid var(--line)}
-.unit-name{font-weight:800;font-size:.8rem;line-height:1.2;display:block;cursor:help}
+.unit-name{font-weight:800;font-size:.8rem;line-height:1.2;display:block;cursor:pointer;background:none;border:none;color:inherit;font-family:inherit;padding:0;text-align:left}
+.unit-name:hover{text-decoration:underline}
 .unit-mean{display:inline-block;font-family:var(--mono);font-weight:600;font-size:.95rem;color:#fff;border-radius:6px;padding:.12rem .5rem;margin-top:.3rem}
 .sub-head{font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.08em;color:var(--ink-soft)}
 .unit-div{font-family:var(--mono);font-size:.62rem;color:var(--ink-soft);display:block;margin-top:.2rem}
@@ -83,3 +83,61 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .cnote{font-size:.78rem;padding:.4rem .5rem;border-left:3px solid var(--line);margin:.3rem 0;background:var(--paper);border-radius:0 6px 6px 0}
 .cnote .cwho{font-family:var(--mono);font-size:.64rem;color:var(--ink-soft);font-weight:600}
 .linkbtn{background:none;border:none;color:var(--xi);font-size:.72rem;cursor:pointer;padding:0;text-decoration:underline}
+.linklike{background:none;border:none;color:var(--xi);cursor:pointer;padding:0;font:inherit;text-decoration:underline}
+
+/* ---- period selector + lock ---- */
+.periodsel{font-family:var(--mono);font-size:.72rem;background:#1f2c38;color:#c8cdd2;border:1px solid #3a4854;border-radius:6px;padding:.25rem .5rem}
+.lockchip{font-family:var(--mono);font-size:.72rem;color:#c8cdd2;background:#1f2c38;border:1px solid #3a4854;border-radius:99px;padding:.3rem .8rem}
+.lockbtn{font-family:var(--mono);font-size:.72rem;font-weight:600;background:var(--xi);color:#fff;border:none;border-radius:99px;padding:.35rem .9rem;cursor:pointer}
+
+/* ---- project chip + status dot ---- */
+.chipwrap{position:relative;display:inline-flex}
+.pdot{position:absolute;right:-3px;bottom:-3px;width:.6rem;height:.6rem;border-radius:50%;border:1.5px solid var(--card);padding:0;cursor:pointer}
+.pdot.solid.st-rapid{background:var(--g1)}
+.pdot.hollow{background:var(--card);border-width:2px}
+.pdot.hollow.st-embed{border-color:#614F56}.pdot.hollow.st-hold{border-color:#77607E}
+.pdot.striped{background:repeating-linear-gradient(45deg,#77607E,#77607E 2px,var(--card) 2px,var(--card) 4px)}
+
+/* ---- modals (lock dialog, case file) ---- */
+.modal-backdrop{position:fixed;inset:0;background:rgba(23,34,44,.55);display:flex;align-items:center;justify-content:center;z-index:80;padding:1rem}
+.modal{background:var(--card);border-radius:12px;padding:1.6rem;max-width:520px;width:100%;max-height:86vh;overflow-y:auto;box-shadow:0 20px 60px rgba(23,34,44,.4);position:relative}
+.modal h3{margin-bottom:.6rem}
+.modal-actions{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.2rem}
+.modal-actions button,.modal button.danger{font-family:inherit;padding:.5rem 1rem;border-radius:8px;border:1px solid var(--line);background:var(--paper);cursor:pointer}
+.modal .danger{background:var(--g4);color:#fff;border-color:var(--g4)}
+.modalclose{position:absolute;top:.8rem;right:1rem;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--ink-soft)}
+.blocklist{list-style:none;margin:.8rem 0}
+.blocklist li{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--line-soft);font-size:.84rem}
+.blocklist button{font-family:inherit;padding:.3rem .7rem;border-radius:7px;border:1px solid var(--line);background:var(--paper);cursor:pointer;white-space:nowrap}
+.casefile{max-width:640px}
+
+/* ---- items to discuss ---- */
+.discussrow{display:flex;gap:.8rem;align-items:flex-start;padding:.8rem 0;border-bottom:1px solid var(--line-soft)}
+.discussrow:last-child{border-bottom:none}
+
+/* ---- case file feed ---- */
+.feed{border-left:2px solid var(--line);padding-left:.9rem;margin-top:.4rem}
+.feeditem{margin-bottom:.8rem}
+
+/* ---- inline editing ---- */
+.editable{cursor:text;border-bottom:1px dashed var(--line)}
+.editable:hover{border-bottom-color:var(--xi)}
+.editform{display:inline-flex;gap:.3rem;align-items:center}
+.editform input{font:inherit;padding:.2rem .4rem;border:1px solid var(--line);border-radius:5px}
+.editform button{font-size:.7rem;padding:.2rem .5rem;border-radius:5px;border:1px solid var(--line);background:var(--paper);cursor:pointer}
+.areaTitle{font-size:1.2rem;font-weight:800}
+
+/* ---- mobile ---- */
+@media (max-width: 720px){
+  .masthead{gap:.5rem}
+  .whoami{width:100%;justify-content:space-between}
+  .board{overflow-x:auto}
+  table.matrix{min-width:900px}
+}
+
+/* ---- print (per-area PDF export, v1) ---- */
+@media print{
+  header, nav.tabs, .lockbtn, .linklike, .fchips, form{display:none !important}
+  .wrap{margin:0;padding:0;max-width:none}
+  .card{box-shadow:none;border:1px solid #ccc}
+}

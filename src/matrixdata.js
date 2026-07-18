@@ -11,14 +11,15 @@ export const CRIT_BY_UNIT = {
   youth:['ys1','ys2'], adult:['as1','as2'],
 };
 export const PERIOD = { q:'Q4', range:'July – September' };
-// Aggregate mean bands — distinct from the 1-4 individual score chips
-// (Mastery/On target/Escalate/Critical). Returns the CSS var suffix to use.
+// Aggregate mean bands. Reuses the same --g1..--g4 palette as the 1-4
+// score chips (1=pink..4=maroon) — "grey"/"brown" are Chris's own names
+// for the purple/maroon shades, not separate colours. <=1.9 pink,
+// >=2.8 maroon, the 0.9-wide middle split evenly between aqua and purple.
 export function meanGrade(m){
-  if (m < 2.0) return 'm1';
-  if (m < 2.5) return 'm2';
-  if (m < 2.8) return 'grey';
-  if (m < 3.0) return 'brown';
-  return 'm4';
+  if (m <= 1.9) return 1;
+  if (m < 2.35) return 2;
+  if (m < 2.8) return 3;
+  return 4;
 }
 export function countdown(){
   const now=new Date(); let end=new Date(now.getFullYear(),7,31,23,59,59);
