@@ -6,6 +6,13 @@ import { BANDS, CRIT_BY_UNIT, PERIOD, meanGrade, countdown } from './matrixdata'
 
 const REV_KEYS = REVIEWERS; // [{key,name,short}]
 
+// Row/column labels are short jargon (eg. "Term pipeline coverage") — hover
+// shows the "on target" descriptor so reviewers know what's being measured.
+function critTip(c){
+  const onTarget = c.descriptors?.[1];
+  return onTarget ? `${c.name} — ${onTarget}` : c.name;
+}
+
 function useGate(){
   const [me, setMe] = useState(() => localStorage.getItem('petxi-me') || '');
   const pick = n => { localStorage.setItem('petxi-me', n); setMe(n); };
@@ -183,7 +190,7 @@ function Company({ data, me, myKey, onScore }){
             {/* unit-critical rows: one row per criterion, placed in its unit column */}
             {units.flatMap(u => (CRIT_BY_UNIT[u.id]||[]).map(cid => critById[cid]).filter(Boolean).map(c => (
               <tr key={c.id}>
-                <td className="crit" title={c.name}>{c.name}</td>
+                <td className="crit" title={critTip(c)}>{c.name}</td>
                 {units.map(u2 => REVIEWERS.map(r => (
                   <td key={u2.id+r.key} className={r.key==='fs'?'usep':''}>
                     {u2.id===c.unit_id ? <Chip c={c} uid={u2.id} rk={r.key}/> : <span className="na">·</span>}
@@ -223,7 +230,7 @@ function FragmentBand({ band, units, critById, Chip }){
         <td colSpan={units.length*2} style={{background:'var(--ink)'}}/></tr>
       {band.ids.map(id => critById[id]).filter(Boolean).map(c => (
         <tr key={c.id}>
-          <td className="crit" title={c.name}>{c.name}</td>
+          <td className="crit" title={critTip(c)}>{c.name}</td>
           {units.map(u => (
             <FragCells key={u.id} c={c} u={u} Chip={Chip} />
           ))}
@@ -264,7 +271,7 @@ function OrgMatrix({ ofuncs, ocrit, oscores, me, myKey, onScore }){
         <table className="matrix">
           <thead>
             <tr><th className="crit-col" rowSpan={2}/>{ocrit.map(c=>
-              <th key={c.id} colSpan={2} className="usep"><span className="unit-name">{c.name}</span></th>)}
+              <th key={c.id} colSpan={2} className="usep" title={critTip(c)}><span className="unit-name">{c.name}</span></th>)}
               <th rowSpan={2}><span className="sub-head">MEAN</span></th></tr>
             <tr>{ocrit.map(c=>REVIEWERS.map(r=>
               <th key={c.id+r.key} className={r.key==='fs'?'usep':''}><span className="sub-head">{r.short}</span></th>))}</tr>
