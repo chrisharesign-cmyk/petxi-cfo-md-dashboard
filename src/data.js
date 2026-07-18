@@ -245,6 +245,11 @@ export async function endMeeting(id, { transcript, attendees, promoted_project_i
     .eq('id', id);
   if (error) throw error;
 }
+export async function loadMeetings() {
+  const { data, error } = await supa.from('meetings').select('*').not('ended_at', 'is', null).order('started_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
 
 // ---- historic means, by period (per-area trajectory) ----
 export async function periodMeans(scope, id) {

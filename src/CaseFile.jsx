@@ -3,7 +3,7 @@ import { supa, REVIEWERS } from './supa';
 import { loadNotes, addNote, editNote, promoteLive, queueProject, pauseProject, resumeLive,
   moveBackLive, completeProject, cancelProject, updateProjectDue } from './data';
 import { STATUS_LABEL, PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
-  friendlyProjectError, daysInStage } from './util';
+  friendlyProjectError, daysInStage, buildProjectPrompt } from './util';
 import EditableText from './EditableText';
 
 function areaName(p, data) {
@@ -55,6 +55,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   const [editingId, setEditingId] = useState(null);
   const [editBody, setEditBody] = useState('');
   const [actionError, setActionError] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const project = data.projects.find(p => p.id === projectId);
 
@@ -127,6 +128,10 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   const badge = statusBadge(project);
   const days = daysInStage(project.status_changed_at);
   const overLimit = project.status === 'live' && project.pace === 'rapid' && days > 14;
+  const copyPrompt = () => {
+    navigator.clipboard?.writeText(buildProjectPrompt(project, data));
+    setCopied(true); setTimeout(() => setCopied(false), 2500);
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -168,7 +173,12 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
         )}
 
         <div className="plan-box">
-          <b style={{ fontSize: '.78rem' }}>Plan</b>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <b style={{ fontSize: '.78rem' }}>Plan</b>
+            <button className="linklike" onClick={copyPrompt} title="Copies a ready-made prompt describing this problem — paste it into claude.ai, then paste the answer back in below">
+              {copied ? 'Copied ✓' : 'Copy prompt for Claude'}
+            </button>
+          </div>
           <EditableText table="projects" id={project.id} field="suggested_solution" value={project.suggested_solution}
             placeholder="No plan yet — click to write one" multiline
             onSaved={onRefresh} />

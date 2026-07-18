@@ -86,6 +86,47 @@ export function friendlyProjectError(err, data, project) {
   return err?.message || String(err);
 }
 
+// No live Claude API in this app (would need a server-side key) — instead,
+// build a good copy-paste prompt so a real conversation can happen manually.
+function critFor(project, data) {
+  return project.scope === 'unit'
+    ? data.criteria.find(c => c.id === project.criterion_id)
+    : data.ocrit.find(c => c.id === project.criterion_id);
+}
+function areaNameFor(project, data) {
+  return project.scope === 'unit'
+    ? data.units.find(u => u.id === project.unit_id)?.name
+    : data.ofuncs.find(f => f.id === project.function_id)?.name;
+}
+
+export function buildProjectPrompt(project, data) {
+  const crit = critFor(project, data);
+  const desc = crit?.descriptors?.[(project.grade_at_creation || 4) - 1];
+  return `We run a quarterly quality review (1=best/Mastery, 4=worst/Critical) at PET-Xi Training. ` +
+    `"${areaNameFor(project, data)}" scored ${project.grade_at_creation} on "${crit?.name || project.criterion_id}".\n\n` +
+    (desc ? `What a ${project.grade_at_creation} looks like here: ${desc}\n\n` : '') +
+    (project.suggested_solution ? `Draft plan so far: ${project.suggested_solution}\n\n` : '') +
+    `Propose a concrete, practical plan to fix this — who should own it, the first 2-3 actions, and whether it's ` +
+    `a quick fix or needs a longer-term plan. Keep it to a few short paragraphs, no fluff.`;
+}
+
+export function buildAreaPrompt(scope, id, data) {
+  const areaName = scope === 'unit' ? data.units.find(u => u.id === id)?.name : data.ofuncs.find(f => f.id === id)?.name;
+  const criteria = scope === 'unit' ? data.criteria.filter(c => !c.unit_id || c.unit_id === id) : data.ocrit;
+  const scoreRows = scope === 'unit' ? data.scores : data.oscores;
+  const bad = criteria.map(c => {
+    const rows = scoreRows.filter(s => s.criterion_id === c.id && (scope === 'unit' ? s.unit_id === id : s.function_id === id));
+    const worst = rows.length ? Math.max(...rows.map(r => r.score)) : null;
+    return worst >= 3 ? { name: c.name, grade: worst, desc: c.descriptors?.[worst - 1] } : null;
+  }).filter(Boolean);
+  if (!bad.length) return `"${areaName}" has no criteria scoring 3 or 4 this period — nothing urgent to explore.`;
+  return `We run a quarterly quality review (1=best/Mastery, 4=worst/Critical) at PET-Xi Training. ` +
+    `"${areaName}" has ${bad.length} criteria scoring 3 or 4 this period:\n\n` +
+    bad.map(b => `- ${b.name}: ${b.grade}${b.desc ? ` — ${b.desc}` : ''}`).join('\n') +
+    `\n\nLooking at these together, propose a holistic plan for "${areaName}" — likely root cause connecting them, ` +
+    `who should own fixing it, and the first few concrete actions. Keep it to a few short paragraphs, no fluff.`;
+}
+
 // Plain-English rendering of an audit_log row's old_row/new_row diff.
 export function describeChange(row) {
   if (row.action === 'INSERT') return `created`;

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { REVIEWERS } from './supa';
 import { periodMeans } from './data';
 import { meanGrade } from './matrixdata';
-import { fmtDate } from './util';
+import { fmtDate, buildAreaPrompt } from './util';
 import EditableText from './EditableText';
 
 function Sparkline({ points }) {
@@ -21,7 +21,12 @@ function Sparkline({ points }) {
 
 export default function AreaPage({ scope, id, data, onBack, onOpenCase }) {
   const [trajectory, setTrajectory] = useState([]);
+  const [copied, setCopied] = useState(false);
   useEffect(() => { periodMeans(scope, id).then(setTrajectory).catch(() => {}); }, [scope, id]);
+  const copyAreaPrompt = () => {
+    navigator.clipboard?.writeText(buildAreaPrompt(scope, id, data));
+    setCopied(true); setTimeout(() => setCopied(false), 2500);
+  };
 
   const area = scope === 'unit' ? data.units.find(u => u.id === id) : data.ofuncs.find(f => f.id === id);
   const criteria = scope === 'unit'
@@ -45,7 +50,12 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase }) {
       <div className="panel-h" style={{ marginTop: '.6rem' }}>
         <span className="bar" style={{ background: 'var(--g2)' }} />
         <EditableText table={table} id={id} field="name" value={area?.name} className="areaTitle" />
-        <button className="linklike" style={{ marginLeft: 'auto' }} onClick={() => window.print()}>Export PDF</button>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: '1rem' }}>
+          <button className="linklike" onClick={copyAreaPrompt} title="Copies a prompt covering everything at 3 or 4 in this area — paste into claude.ai for a holistic plan">
+            {copied ? 'Copied ✓' : 'Explore with Claude'}
+          </button>
+          <button className="linklike" onClick={() => window.print()}>Export PDF</button>
+        </span>
       </div>
 
       <div className="card">

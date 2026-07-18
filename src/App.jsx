@@ -119,6 +119,7 @@ function Dashboard({ me, onLeave }) {
     const key = projectCellKey(p);
     if (!projectsByCell[key] || rank[p.status] < rank[projectsByCell[key].status]) projectsByCell[key] = p;
   });
+  const potentialCount = data.projects.filter(p => p.status === 'potential').length;
 
   return (
     <>
@@ -156,7 +157,7 @@ function Dashboard({ me, onLeave }) {
         </div>
       </header>
       <nav className="tabs">
-        {[['qip', 'SAR'], ['discuss', 'Items to Discuss'], ['projects', 'Excellence Projects']].map(([k, l]) => (
+        {[['qip', 'SAR'], ['discuss', `Items to Discuss${potentialCount ? ` (${potentialCount})` : ''}`], ['projects', 'Excellence Projects']].map(([k, l]) => (
           <button key={k} className={tab === k ? 'active' : ''} onClick={() => { setTab(k); setAreaView(null); }}>{l}</button>
         ))}
       </nav>

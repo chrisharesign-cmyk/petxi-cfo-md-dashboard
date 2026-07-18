@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { promoteLive, queueProject, startMeeting, endMeeting } from './data';
+import { promoteLive, queueProject, startMeeting, endMeeting, loadMeetings } from './data';
 import { fmtDate, overdueBy, friendlyProjectError } from './util';
+
+const INITIAL_SHOWN = 8;
 
 function areaName(p, data) {
   return p.scope === 'unit'
@@ -16,9 +18,11 @@ function critName(p, data) {
 export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProjects }) {
   const [rowError, setRowError] = useState(null); // { id, msg }
   const [toast, setToast] = useState('');
+  const [showAll, setShowAll] = useState(false);
   const potentials = data.projects
     .filter(p => p.status === 'potential')
     .sort((a, b) => (b.grade_at_creation || 0) - (a.grade_at_creation || 0));
+  const shown = showAll ? potentials : potentials.slice(0, INITIAL_SHOWN);
   const waiting = data.projects.filter(p => p.status === 'queued');
   const overdue = data.projects.filter(p => p.due && overdueBy(p.due) && ['live', 'paused'].includes(p.status));
 
@@ -42,7 +46,9 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
 
   return (
     <>
-      <div className="panel-h"><span className="bar" style={{ background: 'var(--g4)' }} />Items to Discuss — {potentials.length} potential, worst grade first</div>
+      <MeetingPanel data={data} me={me} onRefresh={onRefresh} onOpenCase={onOpenCase} />
+
+      <div className="panel-h" style={{ marginTop: '1.4rem' }}><span className="bar" style={{ background: 'var(--g4)' }} />Items to Discuss — {potentials.length} potential, worst grade first</div>
       <p className="muted" style={{ marginBottom: '.8rem' }}>
         Click a project to open it — that's where the plan lives, and where you can assign an owner or agree a
         different pace (Short, Mid or Long term instead of the Rapid Fix default). <b>Agree — Rapid Fix</b> here is
@@ -53,7 +59,7 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
       {toast && <div className="card" style={{ marginBottom: '.8rem', borderColor: 'var(--g2)' }}>{toast}</div>}
       <div className="card">
         {!potentials.length && <p className="muted">Nothing waiting on a decision.</p>}
-        {potentials.map(p => (
+        {shown.map(p => (
           <div key={p.id} className="discussrow" style={{ cursor: 'pointer' }} onClick={() => onOpenCase(p.id)}>
             <span className="key-dot s4" style={{ width: '1.4rem', height: '1.4rem', fontSize: '.8rem' }}>{p.grade_at_creation}</span>
             <div style={{ flex: 1 }}>
@@ -68,6 +74,11 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
             </div>
           </div>
         ))}
+        {potentials.length > INITIAL_SHOWN && (
+          <button className="linklike" style={{ marginTop: '.6rem' }} onClick={() => setShowAll(s => !s)}>
+            {showAll ? 'Show fewer' : `Show all ${potentials.length}`}
+          </button>
+        )}
       </div>
 
       {(waiting.length > 0 || overdue.length > 0) && (
@@ -77,8 +88,6 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
           {overdue.length > 0 && <p><b>{overdue.length}</b> overdue: {overdue.map(p => p.title).join(', ')}</p>}
         </div>
       )}
-
-      <MeetingPanel data={data} me={me} onRefresh={onRefresh} onOpenCase={onOpenCase} />
     </>
   );
 }
@@ -89,12 +98,16 @@ function MeetingPanel({ data, me, onRefresh, onOpenCase }) {
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState([]);
   const [supported, setSupported] = useState(true);
+  const [past, setPast] = useState([]);
+  const [showPast, setShowPast] = useState(null); // meeting id being viewed, or null
   const recRef = useRef(null);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     setSupported(!!SR);
   }, []);
+
+  useEffect(() => { loadMeetings().then(setPast).catch(() => {}); }, []);
 
   // autosave transcript so a refresh/close doesn't lose the in-progress record
   useEffect(() => {
@@ -139,13 +152,14 @@ function MeetingPanel({ data, me, onRefresh, onOpenCase }) {
       await endMeeting(meeting.id, { transcript, attendees: [me], promoted_project_ids: [] });
       localStorage.removeItem('petxi-meeting-draft');
       onRefresh();
+      loadMeetings().then(setPast).catch(() => {});
     }
   };
 
-  const copyForClaude = () => {
+  const copyForClaude = (lines) => {
     const prompt = `Write up minutes from this PET-Xi QIP review meeting transcript. Summarise decisions, ` +
       `list any projects promoted to live or queued, and note follow-ups.\n\nTranscript:\n` +
-      transcript.map(t => `[${t.at}] ${t.text}`).join('\n');
+      lines.map(t => `[${t.at}] ${t.text}`).join('\n');
     navigator.clipboard?.writeText(prompt);
   };
 
@@ -158,7 +172,7 @@ function MeetingPanel({ data, me, onRefresh, onOpenCase }) {
           {!recording
             ? <button onClick={startRec}>● Record</button>
             : <button className="danger" onClick={stopRec}>■ Stop &amp; save</button>}
-          <button onClick={copyForClaude} disabled={!transcript.length}>Copy for Claude</button>
+          <button onClick={() => copyForClaude(transcript)} disabled={!transcript.length}>Copy for Claude</button>
         </div>
         {!supported && <p className="muted" style={{ color: 'var(--g4)' }}>
           Live transcription needs Chrome or Edge — this browser doesn't support it. Recording can't start here.</p>}
@@ -187,6 +201,32 @@ function MeetingPanel({ data, me, onRefresh, onOpenCase }) {
         {transcript.length > 0 && (
           <div style={{ marginTop: '.8rem', maxHeight: 220, overflowY: 'auto' }}>
             {transcript.map((t, i) => <p key={i} className="muted" style={{ fontSize: '.78rem' }}>{t.text}</p>)}
+          </div>
+        )}
+
+        {past.length > 0 && (
+          <div style={{ marginTop: '1rem', borderTop: '1px solid var(--line-soft)', paddingTop: '.8rem' }}>
+            <h4>Past meetings ({past.length})</h4>
+            {past.map(m => (
+              <div key={m.id} style={{ marginTop: '.4rem' }}>
+                <button className="linklike" onClick={() => setShowPast(showPast === m.id ? null : m.id)}>
+                  {new Date(m.started_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {' '}— {(m.transcript || []).length} line{(m.transcript || []).length === 1 ? '' : 's'}
+                  {m.attendees?.length ? ` — ${m.attendees.join(', ')}` : ''}
+                </button>
+                {showPast === m.id && (
+                  <div style={{ marginTop: '.3rem', marginLeft: '1rem' }}>
+                    <button className="linklike" onClick={() => copyForClaude(m.transcript || [])} disabled={!m.transcript?.length}>
+                      Copy for Claude
+                    </button>
+                    <div style={{ maxHeight: 180, overflowY: 'auto', marginTop: '.3rem' }}>
+                      {(m.transcript || []).map((t, i) => <p key={i} className="muted" style={{ fontSize: '.76rem' }}>{t.text}</p>)}
+                      {!m.transcript?.length && <p className="muted">No transcript captured — Chrome/Edge speech recognition may not have been available.</p>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
