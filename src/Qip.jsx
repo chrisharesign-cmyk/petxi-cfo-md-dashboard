@@ -15,8 +15,8 @@ function critTip(c) {
 // if it opens below the viewport the 2/3/4 buttons render off-screen.
 // Flip it to open upward when there isn't room below.
 function pickPos(rect) {
-  const estHeight = 300;
-  const x = Math.min(rect.left, window.innerWidth - 310);
+  const estHeight = 300, estWidth = 310;
+  const x = Math.max(8, Math.min(rect.left, window.innerWidth - estWidth));
   const spaceBelow = window.innerHeight - rect.bottom;
   const y = spaceBelow >= estHeight + 10 ? rect.bottom + 6 : Math.max(8, rect.top - estHeight - 6);
   return { x, y };
@@ -148,23 +148,31 @@ export default function Qip({ data, me, myKey, onScore, canEdit, projectsByCell,
           ? <>Live — scores save to Supabase as {me}. Headline = mean of all scored cells. You edit only your own column ({REVIEWERS.find(r => r.key === myKey).short}); the other is read-only.</>
           : <>Locked — {period?.label}. Grades are read-only; the wording shown on hover is what was judged against at lock time.</>}
       </p>
+      <p className="footnote">
+        Dot on a chip = a project's open against that cell: ● solid live, ▨ hatched on hold, ○ hollow queued or still
+        being discussed — click it to open the case file. A ghosted number = an informal re-read since this SAR
+        locked, ahead of the next official grade.
+      </p>
 
       <OrgMatrix data={data} me={me} myKey={myKey} onScore={onScore} canEdit={canEdit}
         projectsByCell={projectsByCell} onOpenArea={onOpenArea} onOpenCase={onOpenCase} />
 
       {pick && (
-        <div className="pick" style={{ left: pick.x, top: pick.y }} onMouseLeave={() => setPick(null)}>
-          {[1, 2, 3, 4].map(g => (
-            <button key={g} onClick={() => choose(g)}>
-              <span className="pd" style={{ background: `var(--g${g})` }}>{g}</span>
-              <span><span className="pl">{pick.labels[g - 1]}</span><br /><span className="pdesc">{pick.desc[g - 1]}</span></span>
+        <>
+          <div className="pick-backdrop" onClick={() => setPick(null)} />
+          <div className="pick" style={{ left: pick.x, top: pick.y }} onMouseLeave={() => setPick(null)}>
+            {[1, 2, 3, 4].map(g => (
+              <button key={g} onClick={() => choose(g)}>
+                <span className="pd" style={{ background: `var(--g${g})` }}>{g}</span>
+                <span><span className="pl">{pick.labels[g - 1]}</span><br /><span className="pdesc">{pick.desc[g - 1]}</span></span>
+              </button>
+            ))}
+            <button onClick={() => choose(0)}>
+              <span className="pd" style={{ background: 'transparent', border: '1.5px dashed var(--line)', color: '#b6b1a3' }}>–</span>
+              <span><span className="pl">Clear</span><br /><span className="pdesc">Remove this score.</span></span>
             </button>
-          ))}
-          <button onClick={() => choose(0)}>
-            <span className="pd" style={{ background: 'transparent', border: '1.5px dashed var(--line)', color: '#b6b1a3' }}>–</span>
-            <span><span className="pl">Clear</span><br /><span className="pdesc">Remove this score.</span></span>
-          </button>
-        </div>
+          </div>
+        </>
       )}
     </>
   );
@@ -253,13 +261,16 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, projectsByCell, onOpenAr
           </tbody>
         </table>
       </div>
-      {pick && (<div className="pick" style={{ left: pick.x, top: pick.y }} onMouseLeave={() => setPick(null)}>
-        {[1, 2, 3, 4].map(g => (<button key={g} onClick={() => choose(g)}>
-          <span className="pd" style={{ background: `var(--g${g})` }}>{g}</span>
-          <span><span className="pl">{pick.labels[g - 1]}</span><br /><span className="pdesc">{pick.desc[g - 1]}</span></span></button>))}
-        <button onClick={() => choose(0)}><span className="pd" style={{ background: 'transparent', border: '1.5px dashed var(--line)', color: '#b6b1a3' }}>–</span>
-          <span><span className="pl">Clear</span></span></button>
-      </div>)}
+      {pick && (<>
+        <div className="pick-backdrop" onClick={() => setPick(null)} />
+        <div className="pick" style={{ left: pick.x, top: pick.y }} onMouseLeave={() => setPick(null)}>
+          {[1, 2, 3, 4].map(g => (<button key={g} onClick={() => choose(g)}>
+            <span className="pd" style={{ background: `var(--g${g})` }}>{g}</span>
+            <span><span className="pl">{pick.labels[g - 1]}</span><br /><span className="pdesc">{pick.desc[g - 1]}</span></span></button>))}
+          <button onClick={() => choose(0)}><span className="pd" style={{ background: 'transparent', border: '1.5px dashed var(--line)', color: '#b6b1a3' }}>–</span>
+            <span><span className="pl">Clear</span></span></button>
+        </div>
+      </>)}
     </>
   );
 }

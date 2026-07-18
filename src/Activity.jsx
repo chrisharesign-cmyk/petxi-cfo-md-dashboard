@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
-import { loadRecentActivity } from './data';
+import { loadRecentActivity, overallTrend, lastQipMeeting } from './data';
 import { describeActivityRow, gradeMovement, daysInStage } from './util';
+import { meanGrade } from './matrixdata';
+import Sparkline from './Sparkline';
+
+const WINDOWS = [[7, '7 days'], [14, '14 days'], [30, '30 days'], [90, 'the quarter']];
+const AGING_POTENTIAL_DAYS = 14;
+const QIP_MEETING_OVERDUE_DAYS = 14;
 
 function areaName(p, data) {
   return p.scope === 'unit'
@@ -26,10 +32,59 @@ function staleOwnedProjects(data, feed) {
     .sort((a, b) => (b.days ?? 0) - (a.days ?? 0));
 }
 
+function TrendCard() {
+  const [trend, setTrend] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => { overallTrend().then(setTrend).catch(e => setErr(e.message)); }, []);
+  if (err) return null;
+  if (!trend) return <div className="card" style={{ marginBottom: '1rem' }}><p className="muted">Loading trend…</p></div>;
+  const sorted = [...trend].sort((a, b) => a.period_id.localeCompare(b.period_id));
+  const last = sorted[sorted.length - 1];
+  const prev = sorted[sorted.length - 2];
+  const delta = last && prev ? +(prev.mean - last.mean).toFixed(2) : null; // grade 1=best, so a fall in mean = improvement
+  return (
+    <div className="card" style={{ marginBottom: '1rem' }}>
+      <h4>Overall trend — org-wide mean, by period</h4>
+      {sorted.length < 2
+        ? <p className="muted">Not enough history yet — this fills in as periods lock.</p>
+        : <>
+            <Sparkline points={sorted.map(s => ({ mean: s.mean }))} />
+            <p className="muted">
+              This period: <b style={{ color: `var(--g${meanGrade(last.mean)})` }}>{last.mean.toFixed(2)}</b>
+              {prev && (
+                delta > 0
+                  ? <> — improved {Math.abs(delta).toFixed(2)} vs last period ({prev.label || prev.period_id})</>
+                  : delta < 0
+                    ? <> — slipped {Math.abs(delta).toFixed(2)} vs last period ({prev.label || prev.period_id})</>
+                    : <> — unchanged vs last period ({prev.label || prev.period_id})</>
+              )}
+            </p>
+          </>}
+    </div>
+  );
+}
+
+function QipMeetingCard() {
+  const [at, setAt] = useState(undefined); // undefined = loading, null = none yet
+  useEffect(() => { lastQipMeeting().then(setAt).catch(() => setAt(null)); }, []);
+  if (at === undefined) return null;
+  const days = at ? Math.floor((Date.now() - new Date(at)) / 86400000) : null;
+  const overdue = days !== null && days >= QIP_MEETING_OVERDUE_DAYS;
+  return (
+    <div className={`card ${overdue ? 'stale-card' : ''}`} style={{ marginBottom: '1rem' }}>
+      {at
+        ? <p>Last Fleur - QIP meeting: <b>{days}d ago</b> ({new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})
+            {overdue && <span style={{ color: 'var(--g4)' }}> — overdue for a catch-up</span>}</p>
+        : <p className="muted">No Fleur - QIP meeting recorded yet — record one from the Meetings tab.</p>}
+    </div>
+  );
+}
+
 export default function ActivityTab({ data, onOpenCase }) {
+  const [days, setDays] = useState(7);
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState('');
-  useEffect(() => { loadRecentActivity(7).then(setRows).catch(e => setErr(e.message)); }, []);
+  useEffect(() => { setRows(null); loadRecentActivity(days).then(setRows).catch(e => setErr(e.message)); }, [days]);
 
   const movements = data.projects
     .map(p => ({ p, m: gradeMovement(p) }))
@@ -41,19 +96,35 @@ export default function ActivityTab({ data, onOpenCase }) {
     .map(r => ({ row: r, d: describeActivityRow(r, data) }))
     .filter(x => x.d);
   const stale = rows ? staleOwnedProjects(data, feed) : [];
+  const agingPotentials = data.projects
+    .filter(p => p.status === 'potential')
+    .map(p => ({ p, days: daysInStage(p.status_changed_at) }))
+    .filter(x => x.days !== null && x.days >= AGING_POTENTIAL_DAYS)
+    .sort((a, b) => (b.days ?? 0) - (a.days ?? 0));
+
+  const windowLabel = WINDOWS.find(([d]) => d === days)?.[1] || `${days} days`;
 
   return (
     <>
-      <div className="panel-h"><span className="bar" style={{ background: 'var(--g2)' }} />This Week</div>
+      <div className="panel-h" style={{ justifyContent: 'space-between', display: 'flex' }}>
+        <span><span className="bar" style={{ background: 'var(--g2)' }} />This Week</span>
+        <select className="formctl" value={days} onChange={e => setDays(Number(e.target.value))}>
+          {WINDOWS.map(([d, l]) => <option key={d} value={d}>Last {l}</option>)}
+        </select>
+      </div>
       <p className="muted" style={{ marginBottom: '1rem' }}>
         A rollup for anyone who wasn't in the room — what's moved, what's improved, and what actually happened,
-        over the last 7 days.
+        over the last {windowLabel}.
       </p>
+
+      <TrendCard />
+      <QipMeetingCard />
 
       {rows && (
         <div className="card exec-summary">
           <b>{wins.length}</b> improved, <b>{regressions.length}</b> slipped, <b>{feed.length}</b> update{feed.length === 1 ? '' : 's'} logged
-          {stale.length > 0 && <> — <b style={{ color: 'var(--g4)' }}>{stale.length} owned project{stale.length === 1 ? '' : 's'} with no visible progress</b></>}.
+          {stale.length > 0 && <> — <b style={{ color: 'var(--g4)' }}>{stale.length} owned project{stale.length === 1 ? '' : 's'} with no visible progress</b></>}
+          {agingPotentials.length > 0 && <> — <b style={{ color: 'var(--g4)' }}>{agingPotentials.length} waiting {AGING_POTENTIAL_DAYS}d+ on a decision</b></>}.
         </div>
       )}
 
@@ -84,7 +155,7 @@ export default function ActivityTab({ data, onOpenCase }) {
         <div className="card stale-card" style={{ marginTop: '1rem' }}>
           <h4>🔇 No visible progress ({stale.length})</h4>
           <p className="muted" style={{ marginBottom: '.5rem' }}>
-            Owned, live or on hold, but no note, status move or re-grade in the last 7 days.
+            Owned, live or on hold, but no note, status move or re-grade in the last {windowLabel}.
           </p>
           {stale.map(({ p, days }) => (
             <p key={p.id}>
@@ -96,11 +167,26 @@ export default function ActivityTab({ data, onOpenCase }) {
         </div>
       )}
 
+      {agingPotentials.length > 0 && (
+        <div className="card stale-card" style={{ marginTop: '1rem' }}>
+          <h4>🕰 Waiting on a decision ({agingPotentials.length})</h4>
+          <p className="muted" style={{ marginBottom: '.5rem' }}>
+            Sitting in Items to Discuss {AGING_POTENTIAL_DAYS}+ days with no owner, pace or plan agreed yet.
+          </p>
+          {agingPotentials.map(({ p, days }) => (
+            <p key={p.id}>
+              <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
+              {' '}— {areaName(p, data)}<span className="muted"> · {days}d waiting</span>
+            </p>
+          ))}
+        </div>
+      )}
+
       <div className="card" style={{ marginTop: '1rem' }}>
-        <h4>Activity, last 7 days {feed.length > 0 && `(${feed.length})`}</h4>
+        <h4>Activity, last {windowLabel} {feed.length > 0 && `(${feed.length})`}</h4>
         {err && <p className="muted" style={{ color: 'var(--g4)' }}>{err}</p>}
         {!err && !rows && <p className="muted">Loading…</p>}
-        {rows && !feed.length && <p className="muted">Nothing logged this week yet.</p>}
+        {rows && !feed.length && <p className="muted">Nothing logged in this window yet.</p>}
         {feed.map(({ row, d }) => (
           <div key={row.id} className="activity-row">
             <span className="muted" style={{ fontSize: '.7rem', fontFamily: 'var(--mono)' }}>

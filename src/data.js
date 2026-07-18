@@ -292,11 +292,37 @@ export async function loadMeetings() {
   if (error) throw error;
   return data;
 }
+export async function lastQipMeeting() {
+  const { data, error } = await supa.from('meetings').select('started_at')
+    .eq('kind', 'qip').not('ended_at', 'is', null).order('started_at', { ascending: false }).limit(1);
+  if (error) throw error;
+  return data?.[0]?.started_at || null;
+}
 export async function loadMeetingsForProject(projectId) {
   const { data, error } = await supa.from('meetings').select('*')
     .eq('project_id', projectId).not('ended_at', 'is', null).order('started_at', { ascending: false });
   if (error) throw error;
   return data;
+}
+
+// Org-wide mean, by period, across every unit and org-function score —
+// the single trend line for "are we better than last quarter, overall".
+export async function overallTrend() {
+  const [scores, oscores, periods] = await Promise.all([
+    supa.from('scores').select('period_id, score'),
+    supa.from('org_scores').select('period_id, score'),
+    supa.from('sar_periods').select('*').order('starts'),
+  ]);
+  const err = [scores, oscores, periods].find(r => r.error);
+  if (err) throw err.error;
+  const byPeriod = {};
+  [...scores.data, ...oscores.data].forEach(r => { (byPeriod[r.period_id] ||= []).push(r.score); });
+  return periods.data
+    .filter(p => byPeriod[p.id]?.length)
+    .map(p => ({
+      period_id: p.id, label: p.label, locked: !!p.locked_at,
+      mean: byPeriod[p.id].reduce((a, b) => a + b, 0) / byPeriod[p.id].length,
+    }));
 }
 
 // ---- historic means, by period (per-area trajectory) ----

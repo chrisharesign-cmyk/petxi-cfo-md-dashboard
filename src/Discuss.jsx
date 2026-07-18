@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { promoteLive, queueProject } from './data';
-import { overdueBy, friendlyProjectError } from './util';
+import { overdueBy, friendlyProjectError, daysInStage } from './util';
 
 const INITIAL_SHOWN = 8;
+const AGING_POTENTIAL_DAYS = 14;
 
 function areaName(p, data) {
   return p.scope === 'unit'
@@ -44,7 +45,7 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
       onRefresh();
     } catch (e2) { setRowError({ id: p.id, msg: friendlyProjectError(e2, data, p) }); }
   };
-  const lineUp = async (p, e) => {
+  const queueForLater = async (p, e) => {
     e.stopPropagation();
     await queueProject(p.id);
     setToast(`"${p.title}" moved to Excellence Projects, queued — it'll wait there until you promote it to live.`);
@@ -67,28 +68,33 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
       <p className="muted" style={{ marginBottom: '.8rem' }}>
         Click a project to open it — that's where the plan lives, and where you can assign an owner or agree a
         different pace (Short, Mid or Long term instead of the Rapid Fix default). <b>Agree — Rapid Fix</b> here is
-        the one-click shortcut for the common case; <b>Line up</b> queues it for later. Either way it leaves this
+        the one-click shortcut for the common case; <b>Queue for later</b> holds it without starting it yet. Either way it leaves this
         list and moves to the{' '}
         {onGoToProjects ? <button className="linklike" onClick={onGoToProjects}>Excellence Projects</button> : 'Excellence Projects'} tab, it isn't deleted.
       </p>
       {toast && <div className="card" style={{ marginBottom: '.8rem', borderColor: 'var(--g2)' }}>{toast}</div>}
       <div className="card">
         {!potentials.length && <p className="muted">Nothing waiting on a decision.</p>}
-        {shown.map(p => (
+        {shown.map(p => {
+          const waiting = daysInStage(p.status_changed_at);
+          const aging = waiting !== null && waiting >= AGING_POTENTIAL_DAYS;
+          return (
           <div key={p.id} className="discussrow" style={{ cursor: 'pointer' }} onClick={() => onOpenCase(p.id)}>
             <span className="key-dot s4" style={{ width: '1.4rem', height: '1.4rem', fontSize: '.8rem' }}>{p.grade_at_creation}</span>
             <div style={{ flex: 1 }}>
               <b>{p.title}</b><br />
               <span className="muted">{areaName(p, data)} &gt; {critName(p, data)}{p.owner ? ` · owner ${p.owner}` : ''}</span>
+              {aging && <span className="overdue"> · ⏳ waiting {waiting}d for a decision</span>}
               {p.suggested_solution && <p className="muted" style={{ marginTop: '.3rem' }}>{p.suggested_solution}</p>}
               {rowError?.id === p.id && <p className="muted" style={{ color: 'var(--g4)' }}>{rowError.msg}</p>}
             </div>
             <div style={{ display: 'flex', gap: '.4rem' }}>
               <button onClick={(e) => tick(p, e)} title="Agree this as-is and start it immediately">Agree — Rapid Fix</button>
-              <button onClick={(e) => lineUp(p, e)} title="Queue it for later, without starting it yet">Line up</button>
+              <button onClick={(e) => queueForLater(p, e)} title="Queue it for later, without starting it yet">Queue for later</button>
             </div>
           </div>
-        ))}
+          );
+        })}
         {potentials.length > INITIAL_SHOWN && (
           <button className="linklike" style={{ marginTop: '.6rem' }} onClick={() => setShowAll(s => !s)}>
             {showAll ? 'Show fewer' : `Show all ${potentials.length}`}

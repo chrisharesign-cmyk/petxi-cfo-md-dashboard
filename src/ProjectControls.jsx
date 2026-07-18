@@ -3,6 +3,7 @@ import { supa, REVIEWERS } from './supa';
 import { promoteLive, queueProject, pauseProject, resumeLive, moveBackLive,
   completeProject, cancelProject, updateProjectDue } from './data';
 import { PACE_LABEL, PACE_DESC, friendlyProjectError } from './util';
+import { usePrompt } from './Dialogs';
 
 // Owner isn't limited to the two reviewers — anyone (Josh, ops staff, etc.)
 // can be named. Typing a new name and saving it writes straight to
@@ -64,14 +65,15 @@ export function StatusMenu({ project, data, onSaved }) {
   const [open, setOpen] = useState(false);
   const [pace, setPace] = useState('rapid');
   const [error, setError] = useState('');
+  const [askText, textDialog] = usePrompt();
 
   const run = async (fn, ...args) => {
     setError('');
     try { await fn(...args); setOpen(false); onSaved?.(); }
     catch (e) { setError(friendlyProjectError(e, data, project)); }
   };
-  const complete = () => {
-    const what = prompt('What changed? (required to complete)');
+  const complete = async () => {
+    const what = await askText('What changed? Required to mark this complete.', { confirmLabel: 'Complete' });
     if (!what) return;
     const rows = project.scope === 'unit'
       ? data.scores.filter(s => s.unit_id === project.unit_id && s.criterion_id === project.criterion_id)
@@ -79,8 +81,8 @@ export function StatusMenu({ project, data, onSaved }) {
     const grade = rows.length ? Math.max(...rows.map(r => r.score)) : null;
     run(completeProject, project.id, { what_changed: what, grade_at_completion: grade });
   };
-  const cancel = () => {
-    const reason = prompt('Reason for cancelling (kept on record, not deleted):');
+  const cancel = async () => {
+    const reason = await askText('Reason for cancelling — kept on record, not deleted.', { confirmLabel: 'Cancel project', danger: true });
     if (!reason) return;
     run(cancelProject, project.id, reason);
   };
@@ -96,7 +98,7 @@ export function StatusMenu({ project, data, onSaved }) {
               {['rapid', 'short', 'mid', 'long'].map(p => <option key={p} value={p}>{PACE_LABEL[p]}</option>)}
             </select>
             <button onClick={() => run(promoteLive, project.id, pace, data.period)}>Agree</button>
-            <button onClick={() => run(queueProject, project.id)}>Line up</button>
+            <button onClick={() => run(queueProject, project.id)}>Queue for later</button>
           </>}
           {project.status === 'queued' && <>
             <select className="formctl" value={pace} onChange={e => setPace(e.target.value)}>
@@ -113,6 +115,7 @@ export function StatusMenu({ project, data, onSaved }) {
           {['potential', 'queued', 'live', 'paused'].includes(project.status) && <button onClick={cancel}>Cancel</button>}
         </div>
       )}
+      {textDialog}
     </span>
   );
 }

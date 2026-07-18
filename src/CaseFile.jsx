@@ -6,6 +6,7 @@ import { PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
   friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, gradeMovement } from './util';
 import EditableText from './EditableText';
 import { OwnerEditor, TargetEditor } from './ProjectControls';
+import { usePrompt } from './Dialogs';
 
 function areaName(p, data) {
   return p.scope === 'unit'
@@ -49,6 +50,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   const [editBody, setEditBody] = useState('');
   const [actionError, setActionError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [askText, textDialog] = usePrompt();
 
   const project = data.projects.find(p => p.id === projectId);
 
@@ -101,12 +103,12 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   };
 
   const complete = async () => {
-    const what = prompt('What changed? (required to complete)');
+    const what = await askText('What changed? Required to mark this complete.', { confirmLabel: 'Complete' });
     if (!what) return;
     await act(completeProject, project.id, { what_changed: what, grade_at_completion: project.current_grade ?? officialCurrentGrade(project, data) });
   };
   const cancel = async () => {
-    const reason = prompt('Reason for cancelling (kept on record, not deleted):');
+    const reason = await askText('Reason for cancelling — kept on record, not deleted.', { confirmLabel: 'Cancel project', danger: true });
     if (!reason) return;
     await act(cancelProject, project.id, reason);
   };
@@ -171,7 +173,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
         <div className="casefile-actions">
           {project.status === 'potential' && <>
             <AgreePace project={project} data={data} act={act} />
-            <button className="btn" disabled={busy} onClick={() => act(queueProject, project.id)}>Line up — queue for later</button>
+            <button className="btn" disabled={busy} onClick={() => act(queueProject, project.id)}>Queue for later</button>
           </>}
           {project.status === 'queued' && <AgreePace project={project} data={data} act={act} />}
           {project.status === 'live' && <>
@@ -251,6 +253,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
           <button className="btn primary" disabled={busy}>Add</button>
         </form>
       </div>
+      {textDialog}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { startMeeting, endMeeting, loadMeetings, updateMeeting, deleteMeeting } from './data';
 import { fmtDate, overdueBy } from './util';
+import { useConfirm } from './Dialogs';
 
 const KIND_LABEL = { qip: 'Fleur - QIP meeting', project: 'Project meeting' };
 const KIND_CLASS = { qip: 'st-fix', project: 'st-embed' };
@@ -158,6 +159,7 @@ function MeetingRow({ m, data, expanded, onToggle, onOpenCase, onCopy, onChanged
   const [minutes, setMinutes] = useState(m.minutes || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [askConfirm, confirmDialog] = useConfirm();
   const project = m.project_id ? data.projects.find(p => p.id === m.project_id) : null;
   const label = m.title || (m.kind === 'project' ? (project ? `Project meeting — ${project.title}` : 'Project meeting') : KIND_LABEL.qip);
 
@@ -167,7 +169,8 @@ function MeetingRow({ m, data, expanded, onToggle, onOpenCase, onCopy, onChanged
     catch (e) { setError(e.message); } finally { setBusy(false); }
   };
   const remove = async () => {
-    if (!confirm(`Delete this meeting (${label}) permanently? This can't be undone.`)) return;
+    const ok = await askConfirm(`Delete this meeting (${label}) permanently? This can't be undone.`, { confirmLabel: 'Delete meeting', danger: true });
+    if (!ok) return;
     setBusy(true); setError('');
     try { await deleteMeeting(m.id); onChanged(); }
     catch (e) { setError(e.message); setBusy(false); }
@@ -207,6 +210,7 @@ function MeetingRow({ m, data, expanded, onToggle, onOpenCase, onCopy, onChanged
           {!m.transcript?.length && <p className="muted">No transcript captured — Chrome/Edge speech recognition may not have been available.</p>}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }
