@@ -132,9 +132,10 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal casefile" onClick={e => e.stopPropagation()}>
         <button className="modalclose" onClick={onClose}>×</button>
-        <h3>{project.title}</h3>
+        <h3><EditableText table="projects" id={project.id} field="title" value={project.title} onSaved={onRefresh} /></h3>
         <p className="muted">
-          {areaName(project, data)} &gt; {critName(project, data)} · owner <OwnerPicker project={project} act={act} /> · target {fmtDate(project.due)}
+          {areaName(project, data)} &gt; {critName(project, data)} · owner <OwnerPicker project={project} act={act} /> · target{' '}
+          <input type="date" value={project.due || ''} onChange={e => act(updateProjectDue, project.id, e.target.value)} title="Target date" />
         </p>
         <p>
           <span className={`st ${badge.cls}`}>{badge.label}</span>
@@ -159,9 +160,6 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
           {project.status === 'completed' && <button disabled={busy} onClick={() => act(moveBackLive, project.id)}>Moved back — regressed to live</button>}
           {['potential', 'queued', 'live', 'paused'].includes(project.status) &&
             <button disabled={busy} onClick={cancel}>Cancel</button>}
-          {['live', 'paused'].includes(project.status) && (
-            <input type="date" value={project.due || ''} onChange={e => act(updateProjectDue, project.id, e.target.value)} title="Target date" />
-          )}
         </div>
         {actionError && <p className="muted" style={{ color: 'var(--g4)' }}>{actionError}</p>}
 
