@@ -7,6 +7,7 @@ import Qip from './Qip';
 import ProjectsTab from './Projects';
 import DiscussTab from './Discuss';
 import ActivityTab from './Activity';
+import MeetingsTab from './Meetings';
 import AreaPage from './AreaPage';
 import CaseFile from './CaseFile';
 
@@ -158,7 +159,7 @@ function Dashboard({ me, onLeave }) {
         </div>
       </header>
       <nav className="tabs">
-        {[['qip', 'SAR'], ['discuss', `Items to Discuss${potentialCount ? ` (${potentialCount})` : ''}`], ['projects', 'Excellence Projects'], ['activity', 'This Week']].map(([k, l]) => (
+        {[['qip', 'SAR'], ['discuss', `Items to Discuss${potentialCount ? ` (${potentialCount})` : ''}`], ['projects', 'Excellence Projects'], ['meetings', 'Meetings'], ['activity', 'This Week']].map(([k, l]) => (
           <button key={k} className={tab === k ? 'active' : ''} onClick={() => { setTab(k); setAreaView(null); }}>{l}</button>
         ))}
       </nav>
@@ -175,7 +176,8 @@ function Dashboard({ me, onLeave }) {
             {tab === 'qip' && <Qip data={data} me={me} myKey={myKey} onScore={score} canEdit={canEdit}
               projectsByCell={projectsByCell} onOpenArea={setAreaView} onOpenCase={setCaseFileId} />}
             {tab === 'projects' && <ProjectsTab data={data} me={me} onRefresh={refresh} onOpenCase={setCaseFileId} />}
-            {tab === 'discuss' && <DiscussTab data={data} me={me} onRefresh={refresh} onOpenCase={setCaseFileId} onGoToProjects={() => setTab('projects')} />}
+            {tab === 'discuss' && <DiscussTab data={data} me={me} onRefresh={refresh} onOpenCase={setCaseFileId} onGoToProjects={() => setTab('projects')} onGoToMeetings={() => setTab('meetings')} />}
+            {tab === 'meetings' && <MeetingsTab data={data} me={me} onOpenCase={setCaseFileId} />}
             {tab === 'activity' && <ActivityTab data={data} onOpenCase={setCaseFileId} />}
           </>}
       </div>

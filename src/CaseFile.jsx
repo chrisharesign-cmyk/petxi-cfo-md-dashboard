@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supa } from './supa';
 import { loadNotes, addNote, editNote, promoteLive, queueProject, pauseProject, resumeLive,
-  moveBackLive, completeProject, cancelProject, updateProjectDue, updateCurrentGrade } from './data';
+  moveBackLive, completeProject, cancelProject, updateProjectDue, updateCurrentGrade, loadMeetingsForProject } from './data';
 import { PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
   friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, gradeMovement } from './util';
 import EditableText from './EditableText';
@@ -41,6 +41,8 @@ function AgreePace({ project, data, act }) {
 export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   const [notes, setNotes] = useState([]);
   const [audit, setAudit] = useState([]);
+  const [meetings, setMeetings] = useState([]);
+  const [openMeetingId, setOpenMeetingId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [noteBody, setNoteBody] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -57,6 +59,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
     ]);
     setNotes(n);
     setAudit(a.data || []);
+    setMeetings(await loadMeetingsForProject(projectId).catch(() => []));
   };
   useEffect(() => { load(); }, [projectId]);
 
@@ -197,6 +200,25 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
             placeholder="No plan yet — click to write one" multiline
             onSaved={onRefresh} />
         </div>
+
+        {meetings.length > 0 && (
+          <div style={{ marginTop: '1rem' }}>
+            <h4>Meetings ({meetings.length})</h4>
+            {meetings.map(m => (
+              <div key={m.id} style={{ marginTop: '.3rem' }}>
+                <button className="linklike" onClick={() => setOpenMeetingId(openMeetingId === m.id ? null : m.id)}>
+                  {new Date(m.started_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {m.title ? ` — ${m.title}` : ''}{m.minutes ? ' 📝' : ''}
+                </button>
+                {openMeetingId === m.id && (
+                  <p className="muted" style={{ fontSize: '.78rem', marginLeft: '1rem' }}>
+                    {m.minutes || 'No minutes added yet — record and paste them in from the Meetings tab.'}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         <h4 style={{ marginTop: '1rem' }}>Timeline</h4>
         <div className="feed">

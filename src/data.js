@@ -261,9 +261,11 @@ export async function editNote(oldNote, newBody) {
 }
 
 // ---- meetings ----
-export async function startMeeting(started_by, period_id) {
+// kind: 'qip' (Fleur - QIP meeting, general) or 'project' (must carry project_id) —
+// chosen before recording starts, enforced by a DB check constraint.
+export async function startMeeting(started_by, period_id, { kind = 'qip', project_id = null, title = null } = {}) {
   const { data, error } = await supa.from('meetings')
-    .insert({ started_by, period_id }).select().single();
+    .insert({ started_by, period_id, kind, project_id, title }).select().single();
   if (error) throw error;
   return data;
 }
@@ -273,8 +275,26 @@ export async function endMeeting(id, { transcript, attendees, promoted_project_i
     .eq('id', id);
   if (error) throw error;
 }
+// Editing after the fact — mainly for pasting Claude-generated minutes back in.
+export async function updateMeeting(id, fields) {
+  const { error } = await supa.from('meetings').update(fields).eq('id', id);
+  if (error) throw error;
+}
+// The one genuine hard-delete in this app — meetings are a working record,
+// not an audited financial one, and the user explicitly wants to be able
+// to bin a bad recording. UI must confirm before calling this.
+export async function deleteMeeting(id) {
+  const { error } = await supa.from('meetings').delete().eq('id', id);
+  if (error) throw error;
+}
 export async function loadMeetings() {
   const { data, error } = await supa.from('meetings').select('*').not('ended_at', 'is', null).order('started_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+export async function loadMeetingsForProject(projectId) {
+  const { data, error } = await supa.from('meetings').select('*')
+    .eq('project_id', projectId).not('ended_at', 'is', null).order('started_at', { ascending: false });
   if (error) throw error;
   return data;
 }

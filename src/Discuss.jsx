@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { promoteLive, queueProject, startMeeting, endMeeting, loadMeetings } from './data';
-import { fmtDate, overdueBy, friendlyProjectError } from './util';
+import { useState } from 'react';
+import { promoteLive, queueProject } from './data';
+import { overdueBy, friendlyProjectError } from './util';
 
 const INITIAL_SHOWN = 8;
 
@@ -21,7 +21,7 @@ const SORTS = {
   'Newest first': (a, b) => new Date(b.created_at) - new Date(a.created_at),
 };
 
-export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProjects }) {
+export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProjects, onGoToMeetings }) {
   const [rowError, setRowError] = useState(null); // { id, msg }
   const [toast, setToast] = useState('');
   const [showAll, setShowAll] = useState(false);
@@ -53,7 +53,10 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
 
   return (
     <>
-      <MeetingPanel data={data} me={me} onRefresh={onRefresh} onOpenCase={onOpenCase} />
+      <p className="muted">
+        Recording, past minutes and project-linked meetings have moved to their own{' '}
+        {onGoToMeetings ? <button className="linklike" onClick={onGoToMeetings}>Meetings</button> : 'Meetings'} tab.
+      </p>
 
       <div className="panel-h" style={{ marginTop: '1.4rem', justifyContent: 'space-between' }}>
         <span><span className="bar" style={{ background: 'var(--g4)' }} />Items to Discuss — {potentials.length} potential</span>
@@ -100,148 +103,6 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
           {overdue.length > 0 && <p><b>{overdue.length}</b> overdue: {overdue.map(p => p.title).join(', ')}</p>}
         </div>
       )}
-    </>
-  );
-}
-
-function MeetingPanel({ data, me, onRefresh, onOpenCase }) {
-  const [agenda, setAgenda] = useState(null);
-  const [meeting, setMeeting] = useState(null);
-  const [recording, setRecording] = useState(false);
-  const [transcript, setTranscript] = useState([]);
-  const [supported, setSupported] = useState(true);
-  const [past, setPast] = useState([]);
-  const [showPast, setShowPast] = useState(null); // meeting id being viewed, or null
-  const recRef = useRef(null);
-
-  useEffect(() => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    setSupported(!!SR);
-  }, []);
-
-  useEffect(() => { loadMeetings().then(setPast).catch(() => {}); }, []);
-
-  // autosave transcript so a refresh/close doesn't lose the in-progress record
-  useEffect(() => {
-    if (transcript.length) localStorage.setItem('petxi-meeting-draft', JSON.stringify(transcript));
-  }, [transcript]);
-
-  const prepareMeeting = () => {
-    const potentials = data.projects.filter(p => p.status === 'potential')
-      .sort((a, b) => (b.grade_at_creation || 0) - (a.grade_at_creation || 0));
-    const overdueP = data.projects.filter(p => p.due && overdueBy(p.due) && ['live', 'paused'].includes(p.status));
-    setAgenda({ potentials, overdueP });
-  };
-
-  const startRec = async () => {
-    const m = await startMeeting(me, data.period?.id);
-    setMeeting(m);
-    setTranscript([]);
-    setRecording(true);
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    const rec = new SR();
-    rec.continuous = true;
-    rec.interimResults = false;
-    rec.onresult = (ev) => {
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        if (ev.results[i].isFinal) {
-          setTranscript(t => [...t, { at: new Date().toISOString(), text: ev.results[i][0].transcript, tab: document.title }]);
-        }
-      }
-    };
-    rec.onend = () => { if (recRef.current) rec.start(); }; // keep alive across tab switches until user stops
-    recRef.current = rec;
-    rec.start();
-  };
-
-  const stopRec = async () => {
-    const rec = recRef.current;
-    recRef.current = null;
-    rec?.stop?.();
-    setRecording(false);
-    if (meeting) {
-      await endMeeting(meeting.id, { transcript, attendees: [me], promoted_project_ids: [] });
-      localStorage.removeItem('petxi-meeting-draft');
-      onRefresh();
-      loadMeetings().then(setPast).catch(() => {});
-    }
-  };
-
-  const copyForClaude = (lines) => {
-    const prompt = `Write up minutes from this PET-Xi QIP review meeting transcript. Summarise decisions, ` +
-      `list any projects promoted to live or queued, and note follow-ups.\n\nTranscript:\n` +
-      lines.map(t => `[${t.at}] ${t.text}`).join('\n');
-    navigator.clipboard?.writeText(prompt);
-  };
-
-  return (
-    <>
-      <div className="panel-h" style={{ marginTop: '1.4rem' }}><span className="bar" style={{ background: 'var(--g3)' }} />Meeting</div>
-      <div className="card">
-        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.8rem' }}>
-          <button onClick={prepareMeeting}>Prepare meeting</button>
-          {!recording
-            ? <button onClick={startRec}>● Record</button>
-            : <button className="danger" onClick={stopRec}>■ Stop &amp; save</button>}
-          <button onClick={() => copyForClaude(transcript)} disabled={!transcript.length}>Copy for Claude</button>
-        </div>
-        {!supported && <p className="muted" style={{ color: 'var(--g4)' }}>
-          Live transcription needs Chrome or Edge — this browser doesn't support it. Recording can't start here.</p>}
-        {recording && <p className="muted">Recording — {transcript.length} line{transcript.length === 1 ? '' : 's'} captured. Keep this tab open; switching tabs is fine.</p>}
-
-        {agenda && (
-          <div style={{ marginTop: '.8rem' }}>
-            <h4>Agenda</h4>
-            <p><b>Potentials, worst first:</b></p>
-            <ul>
-              {agenda.potentials.map(p => (
-                <li key={p.id}>
-                  <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button> — graded {p.grade_at_creation}
-                </li>
-              ))}
-              {!agenda.potentials.length && <li className="muted">None.</li>}
-            </ul>
-            <p><b>Overdue:</b></p>
-            <ul>
-              {agenda.overdueP.map(p => <li key={p.id}>{p.title} — due {fmtDate(p.due)}</li>)}
-              {!agenda.overdueP.length && <li className="muted">None.</li>}
-            </ul>
-          </div>
-        )}
-
-        {transcript.length > 0 && (
-          <div style={{ marginTop: '.8rem', maxHeight: 220, overflowY: 'auto' }}>
-            {transcript.map((t, i) => <p key={i} className="muted" style={{ fontSize: '.78rem' }}>{t.text}</p>)}
-          </div>
-        )}
-
-        {past.length > 0 && (
-          <div style={{ marginTop: '1rem', borderTop: '1px solid var(--line-soft)', paddingTop: '.8rem' }}>
-            <h4>Past meetings ({past.length})</h4>
-            {past.map(m => (
-              <div key={m.id} style={{ marginTop: '.4rem' }}>
-                <button className="linklike" onClick={() => setShowPast(showPast === m.id ? null : m.id)}>
-                  {new Date(m.started_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  {' '}— {(m.transcript || []).length} line{(m.transcript || []).length === 1 ? '' : 's'}
-                  {m.attendees?.length ? ` — ${m.attendees.join(', ')}` : ''}
-                </button>
-                {showPast === m.id && (
-                  <div style={{ marginTop: '.3rem', marginLeft: '1rem' }}>
-                    <button className="linklike" onClick={() => copyForClaude(m.transcript || [])} disabled={!m.transcript?.length}>
-                      Copy for Claude
-                    </button>
-                    <div style={{ maxHeight: 180, overflowY: 'auto', marginTop: '.3rem' }}>
-                      {(m.transcript || []).map((t, i) => <p key={i} className="muted" style={{ fontSize: '.76rem' }}>{t.text}</p>)}
-                      {!m.transcript?.length && <p className="muted">No transcript captured — Chrome/Edge speech recognition may not have been available.</p>}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </>
   );
 }
