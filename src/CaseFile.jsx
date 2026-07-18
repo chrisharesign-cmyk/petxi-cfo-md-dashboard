@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { supa, REVIEWERS } from './supa';
+import { supa } from './supa';
 import { loadNotes, addNote, editNote, promoteLive, queueProject, pauseProject, resumeLive,
   moveBackLive, completeProject, cancelProject, updateProjectDue } from './data';
-import { STATUS_LABEL, PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
+import { PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
   friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt } from './util';
 import EditableText from './EditableText';
+import { OwnerEditor, TargetEditor } from './ProjectControls';
 
 function areaName(p, data) {
   return p.scope === 'unit'
@@ -23,26 +24,14 @@ function currentGrade(p, data) {
   return rows.length ? Math.max(...rows.map(r => r.score)) : null;
 }
 
-function OwnerPicker({ project, act }) {
-  return (
-    <select value={project.owner || ''} onChange={e => act(async () => {
-      const { error } = await supa.from('projects').update({ owner: e.target.value || null, updated_at: new Date().toISOString() }).eq('id', project.id);
-      if (error) throw error;
-    })}>
-      <option value="">— no owner yet —</option>
-      {REVIEWERS.map(r => <option key={r.key} value={r.name}>{r.name}</option>)}
-    </select>
-  );
-}
-
 function AgreePace({ project, data, act }) {
   const [pace, setPace] = useState('rapid');
   return (
     <span style={{ display: 'inline-flex', gap: '.4rem', alignItems: 'center' }}>
-      <select value={pace} onChange={e => setPace(e.target.value)}>
+      <select className="formctl" value={pace} onChange={e => setPace(e.target.value)}>
         {['rapid', 'short', 'mid', 'long'].map(p => <option key={p} value={p}>{PACE_LABEL[p]} — {PACE_DESC[p]}</option>)}
       </select>
-      <button onClick={() => act(promoteLive, project.id, pace, data.period)}>Agree</button>
+      <button className="btn primary" onClick={() => act(promoteLive, project.id, pace, data.period)}>Agree</button>
     </span>
   );
 }
@@ -90,7 +79,9 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
 
   const feed = [
     { at: project.created_at, kind: 'created', text: `Created — graded ${project.grade_at_creation ?? '—'} at creation.` },
-    ...audit.filter(r => r.action === 'UPDATE').map(r => ({ at: r.at, kind: 'change', text: describeChange(r), actor: r.actor_name })),
+    ...audit.filter(r => r.action === 'UPDATE')
+      .map(r => ({ at: r.at, kind: 'change', text: describeChange(r), actor: r.actor_name }))
+      .filter(r => r.text), // drop rows where nothing user-visible actually changed
     ...notes.filter(n => !n.replaces_note_id).map(root => {
       const chain = chainFrom(root);
       return { at: root.created_at, kind: 'note', note: chain[chain.length - 1], prior: chain.slice(0, -1) };
@@ -138,33 +129,36 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
       <div className="modal casefile" onClick={e => e.stopPropagation()}>
         <button className="modalclose" onClick={onClose}>×</button>
         <h3><EditableText table="projects" id={project.id} field="title" value={project.title} onSaved={onRefresh} /></h3>
-        <p className="muted">
-          {areaName(project, data)} &gt; {critName(project, data)} · owner <OwnerPicker project={project} act={act} /> · target{' '}
-          <input type="date" value={project.due || ''} onChange={e => act(updateProjectDue, project.id, e.target.value)} title="Target date" />
-        </p>
-        <p>
+
+        <div className="casefile-meta">
+          <span>{areaName(project, data)} &gt; {critName(project, data)}</span>
+          <span>· owner <OwnerEditor project={project} data={data} onSaved={onRefresh} /></span>
+          <span>· target <TargetEditor project={project} onSaved={onRefresh} /></span>
+        </div>
+
+        <div>
           <span className={`st ${badge.cls}`}>{badge.label}</span>
           {days !== null && !['completed', 'cancelled'].includes(project.status) && (
             <span className={`muted ${overLimit ? 'at-stage-warn' : ''}`} style={{ marginLeft: '.6rem', fontSize: '.76rem' }}>
               {days}d at this stage{overLimit ? ` ⚠ over 14d limit for ${PACE_LABEL[project.pace]}` : ''}
             </span>
           )}
-        </p>
+        </div>
 
-        <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center', margin: '.6rem 0' }}>
+        <div className="casefile-actions">
           {project.status === 'potential' && <>
             <AgreePace project={project} data={data} act={act} />
-            <button disabled={busy} onClick={() => act(queueProject, project.id)}>Line up — queue for later</button>
+            <button className="btn" disabled={busy} onClick={() => act(queueProject, project.id)}>Line up — queue for later</button>
           </>}
           {project.status === 'queued' && <AgreePace project={project} data={data} act={act} />}
           {project.status === 'live' && <>
-            <button disabled={busy} onClick={() => act(pauseProject, project.id)}>Pause</button>
-            <button disabled={busy} onClick={complete}>Complete</button>
+            <button className="btn" disabled={busy} onClick={() => act(pauseProject, project.id)}>Pause</button>
+            <button className="btn primary" disabled={busy} onClick={complete}>Complete</button>
           </>}
-          {project.status === 'paused' && <button disabled={busy} onClick={() => act(resumeLive, project.id)}>Resume — back to live</button>}
-          {project.status === 'completed' && <button disabled={busy} onClick={() => act(moveBackLive, project.id)}>Moved back — regressed to live</button>}
+          {project.status === 'paused' && <button className="btn primary" disabled={busy} onClick={() => act(resumeLive, project.id)}>Resume — back to live</button>}
+          {project.status === 'completed' && <button className="btn" disabled={busy} onClick={() => act(moveBackLive, project.id)}>Moved back — regressed to live</button>}
           {['potential', 'queued', 'live', 'paused'].includes(project.status) &&
-            <button disabled={busy} onClick={cancel}>Cancel</button>}
+            <button className="btn danger" disabled={busy} onClick={cancel}>Cancel</button>}
         </div>
         {actionError && <p className="muted" style={{ color: 'var(--g4)' }}>{actionError}</p>}
 
@@ -190,13 +184,13 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
             <div key={i} className="feeditem">
               <span className="muted" style={{ fontSize: '.7rem' }}>{new Date(f.at).toLocaleString('en-GB')}</span>
               {f.kind !== 'note' ? (
-                <p>{f.text}{f.actor && <span className="muted"> — {f.actor}</span>}</p>
+                <p>{f.text}{f.actor && f.actor !== 'unknown' && <span className="muted"> — {f.actor}</span>}</p>
               ) : (
                 <div>
                   <p><b>{f.note.author}</b>: {editingId === f.note.id
-                    ? <form onSubmit={e => { e.preventDefault(); saveEdit(f.note); }}>
-                        <input value={editBody} onChange={e => setEditBody(e.target.value)} />
-                        <button>Save</button> <button type="button" onClick={() => setEditingId(null)}>Cancel</button>
+                    ? <form onSubmit={e => { e.preventDefault(); saveEdit(f.note); }} style={{ display: 'inline-flex', gap: '.3rem' }}>
+                        <input className="formctl" value={editBody} onChange={e => setEditBody(e.target.value)} />
+                        <button className="btn">Save</button> <button type="button" className="btn" onClick={() => setEditingId(null)}>Cancel</button>
                       </form>
                     : f.note.body}
                     {editingId !== f.note.id && f.note.author === me &&
@@ -210,8 +204,8 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
         </div>
 
         <form onSubmit={submitNote} style={{ marginTop: '.8rem', display: 'flex', gap: '.4rem' }}>
-          <input placeholder={`Add a note as ${me}`} value={noteBody} onChange={e => setNoteBody(e.target.value)} style={{ flex: 1, padding: '.4rem' }} />
-          <button disabled={busy}>Add</button>
+          <input className="formctl" placeholder={`Add a note as ${me}`} value={noteBody} onChange={e => setNoteBody(e.target.value)} style={{ flex: 1 }} />
+          <button className="btn primary" disabled={busy}>Add</button>
         </form>
       </div>
     </div>

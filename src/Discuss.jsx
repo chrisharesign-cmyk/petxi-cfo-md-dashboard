@@ -15,13 +15,20 @@ function critName(p, data) {
     : data.ocrit.find(c => c.id === p.criterion_id)?.name;
 }
 
+const SORTS = {
+  'Worst grade first': (a, b) => (b.grade_at_creation || 0) - (a.grade_at_creation || 0),
+  'Oldest first': (a, b) => new Date(a.created_at) - new Date(b.created_at),
+  'Newest first': (a, b) => new Date(b.created_at) - new Date(a.created_at),
+};
+
 export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProjects }) {
   const [rowError, setRowError] = useState(null); // { id, msg }
   const [toast, setToast] = useState('');
   const [showAll, setShowAll] = useState(false);
+  const [sortKey, setSortKey] = useState('Worst grade first');
   const potentials = data.projects
     .filter(p => p.status === 'potential')
-    .sort((a, b) => (b.grade_at_creation || 0) - (a.grade_at_creation || 0));
+    .sort(SORTS[sortKey]);
   const shown = showAll ? potentials : potentials.slice(0, INITIAL_SHOWN);
   const waiting = data.projects.filter(p => p.status === 'queued');
   const overdue = data.projects.filter(p => p.due && overdueBy(p.due) && ['live', 'paused'].includes(p.status));
@@ -48,7 +55,12 @@ export default function DiscussTab({ data, me, onRefresh, onOpenCase, onGoToProj
     <>
       <MeetingPanel data={data} me={me} onRefresh={onRefresh} onOpenCase={onOpenCase} />
 
-      <div className="panel-h" style={{ marginTop: '1.4rem' }}><span className="bar" style={{ background: 'var(--g4)' }} />Items to Discuss — {potentials.length} potential, worst grade first</div>
+      <div className="panel-h" style={{ marginTop: '1.4rem', justifyContent: 'space-between' }}>
+        <span><span className="bar" style={{ background: 'var(--g4)' }} />Items to Discuss — {potentials.length} potential</span>
+        <select className="formctl" value={sortKey} onChange={e => setSortKey(e.target.value)}>
+          {Object.keys(SORTS).map(k => <option key={k} value={k}>{k}</option>)}
+        </select>
+      </div>
       <p className="muted" style={{ marginBottom: '.8rem' }}>
         Click a project to open it — that's where the plan lives, and where you can assign an owner or agree a
         different pace (Short, Mid or Long term instead of the Rapid Fix default). <b>Agree — Rapid Fix</b> here is

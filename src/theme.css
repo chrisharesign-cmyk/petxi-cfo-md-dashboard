@@ -118,8 +118,32 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .discussrow:last-child{border-bottom:none}
 
 /* ---- case file feed ---- */
-.feed{border-left:2px solid var(--line);padding-left:.9rem;margin-top:.4rem}
+.feed{border-left:2px solid var(--line);padding-left:.9rem;margin-top:.4rem;max-height:280px;overflow-y:auto}
 .feeditem{margin-bottom:.8rem}
+
+/* ---- form controls + buttons inside modals (was raw browser-default styling) ---- */
+.formctl{font-family:inherit;font-size:.82rem;padding:.35rem .6rem;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink)}
+.btn{font-family:inherit;font-size:.78rem;font-weight:600;padding:.45rem .9rem;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.btn:hover{background:var(--paper)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.primary{background:var(--xi);color:#fff;border-color:var(--xi)}
+.btn.primary:hover{background:#b81570}
+.btn.danger{background:var(--g4);color:#fff;border-color:var(--g4)}
+.btn.danger:hover{background:#8a2e33}
+.casefile h3{font-size:1.15rem}
+.casefile .st{font-size:.7rem;padding:.22rem .6rem}
+.casefile-meta{font-family:var(--mono);font-size:.72rem;color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:.3rem .5rem;align-items:center;margin:.4rem 0 .8rem}
+.casefile-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:.8rem 0;padding:.8rem;background:var(--paper);border-radius:8px}
+
+/* ---- compact status-change menu (table rows) ---- */
+.statusmenu{position:absolute;right:0;top:100%;z-index:40;background:var(--card);border:1px solid var(--line);border-radius:9px;box-shadow:0 10px 24px rgba(23,34,44,.22);padding:.6rem;display:flex;flex-direction:column;gap:.4rem;min-width:170px}
+.statusmenu button{font-family:inherit;font-size:.76rem;padding:.35rem .6rem;border-radius:6px;border:1px solid var(--line);background:var(--paper);cursor:pointer;text-align:left}
+.statusmenu button:hover{background:var(--line-soft)}
+
+/* ---- sortable table headers ---- */
+.ptable th.sortable{cursor:pointer;user-select:none}
+.ptable th.sortable:hover{color:var(--ink)}
+.ptable th .sortarrow{margin-left:.25rem;opacity:.6}
 
 /* ---- inline editing ---- */
 .editable{cursor:text;border-bottom:1px dashed var(--line)}

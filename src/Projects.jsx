@@ -1,9 +1,36 @@
 import { useState } from 'react';
 import { addProject } from './data';
 import { STATUS_LABEL, statusBadge, fmtDate, overdueBy, daysInStage, isOverStageLimit } from './util';
+import { OwnerEditor, ImpactEditor, TargetEditor, StatusMenu } from './ProjectControls';
+import EditableText from './EditableText';
 
 const RAG = { G: '#97D700', A: '#E8A317', R: '#D0342C' };
 const STATUSES = ['potential', 'queued', 'live', 'paused', 'completed', 'cancelled'];
+
+const COLUMNS = [
+  { key: 'title', label: 'Project' },
+  { key: 'area', label: 'Area' },
+  { key: 'owner', label: 'Owner' },
+  { key: 'status', label: 'Status' },
+  { key: 'impact', label: 'Impact' },
+  { key: 'stage', label: 'At stage' },
+  { key: 'target', label: 'Target' },
+  { key: 'blocker', label: 'Blocker' },
+];
+const IMPACT_RANK = { G: 0, A: 1, R: 2 };
+function sortValue(p, data, key) {
+  switch (key) {
+    case 'title': return p.title?.toLowerCase() || '';
+    case 'area': return `${areaName(p, data)} ${critName(p, data)}`.toLowerCase();
+    case 'owner': return p.owner?.toLowerCase() || '￿'; // unowned sorts last
+    case 'status': return statusBadge(p).label.toLowerCase();
+    case 'impact': return p.impact ? IMPACT_RANK[p.impact] : 99;
+    case 'stage': return daysInStage(p.status_changed_at) ?? -1;
+    case 'target': return p.due || '9999-99-99';
+    case 'blocker': return p.blocked_by?.toLowerCase() || '';
+    default: return '';
+  }
+}
 
 function areaName(p, data) {
   return p.scope === 'unit'
@@ -19,7 +46,9 @@ function critName(p, data) {
 export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
   const [filters, setFilters] = useState(new Set());
   const [showAdd, setShowAdd] = useState(false);
+  const [sort, setSort] = useState({ key: 'stage', dir: 'desc' });
   const toggle = f => setFilters(s => { const n = new Set(s); n.has(f) ? n.delete(f) : n.add(f); return n; });
+  const toggleSort = key => setSort(s => s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
 
   const periodStart = data.period ? new Date(data.period.starts) : null;
   const rows = data.projects.filter(p => {
@@ -31,6 +60,10 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
       if (f === 'Mine' && p.owner === me) return true;
     }
     return false;
+  }).sort((a, b) => {
+    const av = sortValue(a, data, sort.key), bv = sortValue(b, data, sort.key);
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return sort.dir === 'asc' ? cmp : -cmp;
   });
 
   return (
@@ -39,7 +72,10 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
         <span><span className="bar" style={{ background: 'var(--g1)' }} />Excellence Projects List — {data.projects.length} projects</span>
         <button onClick={() => setShowAdd(s => !s)}>{showAdd ? 'Cancel' : '+ Add project'}</button>
       </div>
-      <p className="muted" style={{ marginBottom: '.6rem' }}>Click any row to open it — pause, complete, cancel, add notes, or change its target date.</p>
+      <p className="muted" style={{ marginBottom: '.6rem' }}>
+        Owner, Status, Impact, Target and Blocker are all editable right here in the table. Click the project name,
+        area or "at stage" to open the full case file with notes and history. Click a column header to sort.
+      </p>
 
       <div className="fchips">
         {[...STATUSES, 'Overdue', 'New this period', 'Mine'].map(f => (
@@ -55,8 +91,12 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
         <table className="ptable">
           <thead>
             <tr>
-              <th>Project</th><th>Area</th><th>Owner</th><th>Status</th><th>Impact</th>
-              <th>At stage</th><th>Target</th><th>Blocker</th>
+              {COLUMNS.map(c => (
+                <th key={c.key} className="sortable" onClick={() => toggleSort(c.key)}>
+                  {c.label}
+                  {sort.key === c.key && <span className="sortarrow">{sort.dir === 'asc' ? '▲' : '▼'}</span>}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -68,15 +108,25 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
               const overLimit = isOverStageLimit(p, days);
               const showDays = days !== null && !['completed', 'cancelled'].includes(p.status);
               return (
-                <tr key={p.id} onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>
-                  <td>{p.title}{isNew && <span className="newtag">NEW</span>}</td>
-                  <td>{areaName(p, data)} &gt; {critName(p, data)}</td>
-                  <td>{p.owner || '—'}</td>
-                  <td><span className={`st ${badge.cls}`}>{badge.label}</span></td>
-                  <td>{p.impact ? <span className="rag" style={{ background: RAG[p.impact] }} title={p.impact} /> : '—'}</td>
-                  <td>{showDays ? <>{days}d{overLimit && <span className="overdue"> ⚠ over 14d limit</span>}</> : '—'}</td>
-                  <td>{fmtDate(p.due)}{overdue && <span className="overdue"> {overdueBy(p.due)}d overdue</span>}</td>
-                  <td>{p.blocked_by || '—'}</td>
+                <tr key={p.id}>
+                  <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>{p.title}{isNew && <span className="newtag">NEW</span>}</td>
+                  <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>{areaName(p, data)} &gt; {critName(p, data)}</td>
+                  <td><OwnerEditor project={p} data={data} onSaved={onRefresh} /></td>
+                  <td>
+                    <span className={`st ${badge.cls}`}>{badge.label}</span>
+                    <StatusMenu project={p} data={data} onSaved={onRefresh} />
+                  </td>
+                  <td><ImpactEditor project={p} onSaved={onRefresh} /></td>
+                  <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>
+                    {showDays ? <>{days}d{overLimit && <span className="overdue"> ⚠ over 14d limit</span>}</> : '—'}
+                  </td>
+                  <td>
+                    <TargetEditor project={p} onSaved={onRefresh} />
+                    {overdue && <span className="overdue"> {overdueBy(p.due)}d overdue</span>}
+                  </td>
+                  <td onClick={e => e.stopPropagation()}>
+                    <EditableText table="projects" id={p.id} field="blocked_by" value={p.blocked_by} placeholder="—" onSaved={onRefresh} />
+                  </td>
                 </tr>
               );
             })}

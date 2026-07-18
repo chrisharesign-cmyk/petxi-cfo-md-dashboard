@@ -105,6 +105,19 @@ function areaNameFor(project, data) {
     : data.ofuncs.find(f => f.id === project.function_id)?.name;
 }
 
+// Kept deliberately terse and rigidly formatted — this gets pasted straight
+// into a planning doc, so no preamble, no hedging, no essay.
+const ANSWER_FORMAT = `Answer in EXACTLY this format and nothing else — no introduction, no caveats, no extra paragraphs:
+
+(1) Owner: [a name and their likely role]
+
+(2) First actions:
+a - [one short, concrete sentence]
+b - [one short, concrete sentence]
+c - [one short, concrete sentence — omit if only 2 actions are genuinely needed]
+
+Each action line is ONE sentence. No headings, no bold text, no restating the problem.`;
+
 export function buildProjectPrompt(project, data) {
   const crit = critFor(project, data);
   const desc = crit?.descriptors?.[(project.grade_at_creation || 4) - 1];
@@ -112,8 +125,7 @@ export function buildProjectPrompt(project, data) {
     `"${areaNameFor(project, data)}" scored ${project.grade_at_creation} on "${crit?.name || project.criterion_id}".\n\n` +
     (desc ? `What a ${project.grade_at_creation} looks like here: ${desc}\n\n` : '') +
     (project.suggested_solution ? `Draft plan so far: ${project.suggested_solution}\n\n` : '') +
-    `Propose a concrete, practical plan to fix this — who should own it, the first 2-3 actions, and whether it's ` +
-    `a quick fix or needs a longer-term plan. Keep it to a few short paragraphs, no fluff.`;
+    ANSWER_FORMAT;
 }
 
 export function buildAreaPrompt(scope, id, data) {
@@ -129,17 +141,21 @@ export function buildAreaPrompt(scope, id, data) {
   return `We run a quarterly quality review (1=best/Mastery, 4=worst/Critical) at PET-Xi Training. ` +
     `"${areaName}" has ${bad.length} criteria scoring 3 or 4 this period:\n\n` +
     bad.map(b => `- ${b.name}: ${b.grade}${b.desc ? ` — ${b.desc}` : ''}`).join('\n') +
-    `\n\nLooking at these together, propose a holistic plan for "${areaName}" — likely root cause connecting them, ` +
-    `who should own fixing it, and the first few concrete actions. Keep it to a few short paragraphs, no fluff.`;
+    `\n\nLooking at these together, treat it as one connected problem for "${areaName}", not ${bad.length} separate ones.\n\n` +
+    ANSWER_FORMAT;
 }
 
 // Plain-English rendering of an audit_log row's old_row/new_row diff.
+// A few columns are bookkeeping, not something worth showing as "changed":
+// updated_at/status_changed_at are redundant with the status change itself,
+// and suggested_solution's own edits are already shown via the Plan field.
+const NOISY_FIELDS = new Set(['updated_at', 'status_changed_at', 'suggested_solution']);
 export function describeChange(row) {
   if (row.action === 'INSERT') return `created`;
   if (row.action === 'DELETE') return `deleted`;
   const before = row.old_row || {}, after = row.new_row || {};
   const changed = Object.keys(after).filter(k =>
-    k !== 'updated_at' && JSON.stringify(after[k]) !== JSON.stringify(before[k]));
-  if (!changed.length) return 'updated';
+    !NOISY_FIELDS.has(k) && JSON.stringify(after[k]) !== JSON.stringify(before[k]));
+  if (!changed.length) return null; // nothing worth showing — caller should skip this row
   return changed.map(k => `${k}: "${before[k] ?? '—'}" → "${after[k] ?? '—'}"`).join('; ');
 }
