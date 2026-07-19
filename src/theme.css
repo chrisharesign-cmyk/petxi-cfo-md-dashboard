@@ -95,24 +95,15 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .periodsel{font-family:var(--mono);font-size:.72rem;background:#1f2c38;color:#c8cdd2;border:1px solid #3a4854;border-radius:6px;padding:.25rem .5rem}
 .lockchip{font-family:var(--mono);font-size:.72rem;color:#c8cdd2;background:#1f2c38;border:1px solid #3a4854;border-radius:99px;padding:.3rem .8rem}
 .lockbtn{font-family:var(--mono);font-size:.72rem;font-weight:600;background:var(--xi);color:#fff;border:none;border-radius:99px;padding:.35rem .9rem;cursor:pointer}
-.lockbtn.spool{background:var(--g2)}
 .lockbtn:disabled{opacity:.6;cursor:default}
 
-/* ---- project chip + status dot ---- */
-.chipwrap{position:relative;display:inline-flex}
-.pdot{position:absolute;right:-3px;bottom:-3px;width:.6rem;height:.6rem;border-radius:50%;border:1.5px solid var(--card);padding:0;cursor:pointer}
-.pdot.solid.st-rapid{background:var(--g1)}
-.pdot.hollow{background:var(--card);border-width:2px}
-.pdot.hollow.st-embed{border-color:#614F56}.pdot.hollow.st-hold{border-color:#77607E}
-.pdot.striped{background:repeating-linear-gradient(45deg,#77607E,#77607E 2px,var(--card) 2px,var(--card) 4px)}
-.pdot-count{width:1.05rem;height:1.05rem;font-size:.52rem;color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;right:-6px;bottom:-6px}
-
-/* ---- ghosted informal re-grade, opposite corner from the pdot ---- */
-.ghostgrade{position:absolute;left:-5px;top:-5px;width:1.1rem;height:1.1rem;border-radius:5px;padding:0;cursor:pointer;
-  font-family:var(--mono);font-size:.62rem;font-weight:700;display:flex;align-items:center;justify-content:center;
-  background:#c9c5b8;color:#5a564a;border:1.5px dashed #9a9585;opacity:.9}
-.ghostgrade.up{background:#cfe8c9;color:#2f6b2a;border-color:#7fb374}
-.ghostgrade.down{background:#f0d3d3;color:#8a2e33;border-color:#c98080}
+/* ---- always-visible circle nav, between the two reviewer chips ---- */
+.circle-cell{text-align:center;vertical-align:middle}
+.circlenav{width:1.85rem;height:1.85rem;border-radius:50%;border:1.5px dashed var(--line);background:transparent;
+  color:#b6b1a3;font-family:var(--mono);font-weight:700;font-size:.82rem;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;transition:transform .08s}
+.circlenav:hover{transform:scale(1.12)}
+.circlenav.has-count{background:var(--g2);color:#fff;border-style:solid;border-color:var(--g2)}
 
 /* ---- modals (lock dialog, case file) ---- */
 .modal-backdrop{position:fixed;inset:0;background:rgba(23,34,44,.55);display:flex;align-items:center;justify-content:center;z-index:80;padding:1rem}

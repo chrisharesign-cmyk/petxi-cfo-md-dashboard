@@ -5,7 +5,6 @@ import { meanGrade } from './matrixdata';
 import Sparkline from './Sparkline';
 
 const WINDOWS = [[7, '7 days'], [14, '14 days'], [30, '30 days'], [90, 'the quarter']];
-const AGING_POTENTIAL_DAYS = 14;
 const QIP_MEETING_OVERDUE_DAYS = 14;
 
 function areaName(p, data) {
@@ -26,7 +25,7 @@ function staleOwnedProjects(data, feed) {
     if (row.table_name === 'projects' && row.record_pk) activeIds.add(Number(row.record_pk));
   });
   return data.projects
-    .filter(p => ['live', 'paused'].includes(p.status) && p.owner && !activeIds.has(p.id))
+    .filter(p => !p.archived_at && ['live', 'paused'].includes(p.status) && p.owner && !activeIds.has(p.id))
     .map(p => ({ p, days: daysInStage(p.status_changed_at) }))
     .filter(x => x.days === null || x.days >= STALE_MIN_DAYS)
     .sort((a, b) => (b.days ?? 0) - (a.days ?? 0));
@@ -87,6 +86,7 @@ export default function ActivityTab({ data, onOpenCase }) {
   useEffect(() => { setRows(null); loadRecentActivity(days).then(setRows).catch(e => setErr(e.message)); }, [days]);
 
   const movements = data.projects
+    .filter(p => !p.archived_at)
     .map(p => ({ p, m: gradeMovement(p) }))
     .filter(x => x.m);
   const wins = movements.filter(x => x.m.improved);
@@ -96,11 +96,6 @@ export default function ActivityTab({ data, onOpenCase }) {
     .map(r => ({ row: r, d: describeActivityRow(r, data) }))
     .filter(x => x.d);
   const stale = rows ? staleOwnedProjects(data, feed) : [];
-  const agingPotentials = data.projects
-    .filter(p => p.status === 'potential')
-    .map(p => ({ p, days: daysInStage(p.status_changed_at) }))
-    .filter(x => x.days !== null && x.days >= AGING_POTENTIAL_DAYS)
-    .sort((a, b) => (b.days ?? 0) - (a.days ?? 0));
 
   const windowLabel = WINDOWS.find(([d]) => d === days)?.[1] || `${days} days`;
 
@@ -123,8 +118,7 @@ export default function ActivityTab({ data, onOpenCase }) {
       {rows && (
         <div className="card exec-summary">
           <b>{wins.length}</b> improved, <b>{regressions.length}</b> slipped, <b>{feed.length}</b> update{feed.length === 1 ? '' : 's'} logged
-          {stale.length > 0 && <> — <b style={{ color: 'var(--g4)' }}>{stale.length} owned project{stale.length === 1 ? '' : 's'} with no visible progress</b></>}
-          {agingPotentials.length > 0 && <> — <b style={{ color: 'var(--g4)' }}>{agingPotentials.length} waiting {AGING_POTENTIAL_DAYS}d+ on a decision</b></>}.
+          {stale.length > 0 && <> — <b style={{ color: 'var(--g4)' }}>{stale.length} owned project{stale.length === 1 ? '' : 's'} with no visible progress</b></>}.
         </div>
       )}
 
@@ -162,21 +156,6 @@ export default function ActivityTab({ data, onOpenCase }) {
               <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
               {' '}— {areaName(p, data)} · owner <b>{p.owner}</b>
               {days !== null && <span className="muted"> · {days}d at this stage</span>}
-            </p>
-          ))}
-        </div>
-      )}
-
-      {agingPotentials.length > 0 && (
-        <div className="card stale-card" style={{ marginTop: '1rem' }}>
-          <h4>🕰 Waiting on a decision ({agingPotentials.length})</h4>
-          <p className="muted" style={{ marginBottom: '.5rem' }}>
-            Sitting in Items to Discuss {AGING_POTENTIAL_DAYS}+ days with no owner, pace or plan agreed yet.
-          </p>
-          {agingPotentials.map(({ p, days }) => (
-            <p key={p.id}>
-              <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
-              {' '}— {areaName(p, data)}<span className="muted"> · {days}d waiting</span>
             </p>
           ))}
         </div>

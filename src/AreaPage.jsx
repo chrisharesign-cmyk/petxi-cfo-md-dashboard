@@ -5,7 +5,7 @@ import { fmtDate, buildAreaPrompt } from './util';
 import EditableText from './EditableText';
 import Sparkline from './Sparkline';
 
-export default function AreaPage({ scope, id, data, onBack, onOpenCase }) {
+export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCriterion }) {
   const [trajectory, setTrajectory] = useState([]);
   const [copied, setCopied] = useState(false);
   useEffect(() => { periodMeans(scope, id).then(setTrajectory).catch(() => {}); }, [scope, id]);
@@ -26,7 +26,7 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase }) {
   const table = scope === 'unit' ? 'units' : 'org_functions';
   const critTable = scope === 'unit' ? 'criteria' : 'org_criteria';
 
-  const projects = data.projects.filter(p => p.scope === scope && (scope === 'unit' ? p.unit_id === id : p.function_id === id));
+  const projects = data.projects.filter(p => !p.archived_at && p.scope === scope && (scope === 'unit' ? p.unit_id === id : p.function_id === id));
   const open = projects.filter(p => ['potential', 'queued', 'live', 'paused'].includes(p.status));
   const completed = projects.filter(p => p.status === 'completed');
 
@@ -54,7 +54,17 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase }) {
               const snap = cells.find(x => x.row?.descriptor_snapshot)?.row?.descriptor_snapshot;
               return (
                 <tr key={c.id}>
-                  <td><EditableText table={critTable} id={c.id} field="name" value={c.name} /></td>
+                  <td>
+                    <EditableText table={critTable} id={c.id} field="name" value={c.name} />
+                    {onOpenCriterion && (
+                      <button className="linklike" style={{ marginLeft: '.4rem', fontSize: '.72rem' }}
+                        onClick={() => onOpenCriterion(scope === 'unit'
+                          ? { scope, unit_id: id, function_id: null, criterion_id: c.id }
+                          : { scope, unit_id: null, function_id: id, criterion_id: c.id })}>
+                        root cause &amp; projects →
+                      </button>
+                    )}
+                  </td>
                   {cells.map(({ reviewer, row }) => (
                     <td key={reviewer.key}>{row ? <span className={`chip s${row.score}`} style={{ position: 'static' }}>{row.score}</span> : '—'}</td>
                   ))}

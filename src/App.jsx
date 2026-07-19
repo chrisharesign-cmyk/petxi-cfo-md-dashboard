@@ -1,14 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import './theme.css';
 import { supa, REVIEWERS } from './supa';
-import { loadAll, lockPeriod, spoolProjects, addProject, promoteLive, projectCellKey, unitCellKey, orgCellKey, OPEN_STATUSES } from './data';
+import { loadAll, lockPeriod, addProject, promoteLive, projectCellKey, unitCellKey, orgCellKey, OPEN_STATUSES } from './data';
 import { nextPeriod, friendlyProjectError, autoTarget } from './util';
 import Qip from './Qip';
 import ProjectsTab from './Projects';
-import DiscussTab from './Discuss';
 import ActivityTab from './Activity';
 import MeetingsTab from './Meetings';
 import AreaPage from './AreaPage';
+import CriterionPage from './CriterionPage';
 import CaseFile from './CaseFile';
 
 function useGate() {
@@ -49,10 +49,11 @@ function Dashboard({ me, onLeave }) {
   const [err, setErr] = useState(null);
   const [save, setSave] = useState('');
   const [lockDialog, setLockDialog] = useState(null); // null | 'confirm' | 'working' | { cells }
-  const [spoolMsg, setSpoolMsg] = useState('');
-  const [spooling, setSpooling] = useState(false);
   const [areaView, setAreaView] = useState(null);
+  const [criterionView, setCriterionView] = useState(null);
   const [caseFileId, setCaseFileId] = useState(null);
+  const openCriterion = (c) => { setCriterionView(c); setAreaView(null); };
+  const openArea = (a) => { setAreaView(a); setCriterionView(null); };
   const myKey = REVIEWERS.find(r => r.name === me)?.key;
 
   const refresh = useCallback(async () => {
@@ -97,16 +98,6 @@ function Dashboard({ me, onLeave }) {
     } catch (e) { setErr(e.message); setLockDialog(null); }
   }
 
-  async function doSpool() {
-    setSpooling(true); setSpoolMsg('');
-    try {
-      const res = await spoolProjects(periodId);
-      setSpoolMsg(res.created ? `${res.created} new project${res.created === 1 ? '' : 's'} spooled to Items to Discuss` : 'Nothing new — every 3/4 already has an open project');
-      await refresh();
-    } catch (e) { setErr(e.message); }
-    finally { setSpooling(false); setTimeout(() => setSpoolMsg(''), 4000); }
-  }
-
   async function startNextPeriod() {
     const np = nextPeriod(data.period);
     const { error } = await supa.from('sar_periods').insert(np);
@@ -114,26 +105,23 @@ function Dashboard({ me, onLeave }) {
     setPeriodId(np.id);
   }
 
-  // A cell can now hold more than one open project (the one-live-per-cell
-  // guard was removed) — collect all of them, best status first, so the
-  // matrix can show a count instead of silently hiding the rest. A project
-  // also shows up on any extra area it's tagged as "also affecting" via
-  // project_links, not just its primary home.
-  const projectsByCell = {};
-  const rank = { live: 0, paused: 1, queued: 2, potential: 3 };
-  const addToCell = (key, p) => { (projectsByCell[key] ||= []).push(p); };
+  // Live-project count per cell, for the always-visible circle between the
+  // two reviewer columns — includes projects tagged as "also affecting"
+  // this cell via project_links, not just primary-home ones. Archived
+  // projects never count; nothing else about the count depends on status
+  // beyond "live" since that's what "running" means now.
+  const liveCountByCell = {};
+  const bump = (key) => { liveCountByCell[key] = (liveCountByCell[key] || 0) + 1; };
   data.projects.forEach(p => {
-    if (!OPEN_STATUSES.includes(p.status)) return;
-    addToCell(projectCellKey(p), p);
+    if (p.status !== 'live' || p.archived_at) return;
+    bump(projectCellKey(p));
   });
   (data.projectLinks || []).forEach(link => {
     const p = data.projects.find(pr => pr.id === link.project_id);
-    if (!p || !OPEN_STATUSES.includes(p.status)) return;
+    if (!p || p.status !== 'live' || p.archived_at) return;
     const key = link.scope === 'unit' ? unitCellKey(link.unit_id, link.criterion_id) : orgCellKey(link.function_id, link.criterion_id);
-    addToCell(key, p);
+    bump(key);
   });
-  Object.values(projectsByCell).forEach(list => list.sort((a, b) => rank[a.status] - rank[b.status]));
-  const potentialCount = data.projects.filter(p => p.status === 'potential').length;
 
   return (
     <>
@@ -142,7 +130,7 @@ function Dashboard({ me, onLeave }) {
           <div className="brand">PET-<em>Xi</em></div>
           <h1>Quality Improvement Plan</h1>
           <div className="whoami">
-            <select className="periodsel" value={periodId || ''} onChange={e => { setPeriodId(e.target.value); setAreaView(null); }}>
+            <select className="periodsel" value={periodId || ''} onChange={e => { setPeriodId(e.target.value); setAreaView(null); setCriterionView(null); }}>
               {data.periods.map(p => <option key={p.id} value={p.id}>{p.label}{p.locked_at ? ' (locked)' : ''}</option>)}
             </select>
             <span>Reviewing as <b>{me}</b></span>
@@ -156,23 +144,17 @@ function Dashboard({ me, onLeave }) {
           <div className="key-item"><span className="key-dot s3">3</span> Escalate — senior intervention this week</div>
           <div className="key-item"><span className="key-dot s4">4</span> Critical — in ICU, run under direct control</div>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '.6rem' }}>
-            {spoolMsg && <span className="lockchip">{spoolMsg}</span>}
             {!canEdit ? (
               <span className="lockchip">🔒 Locked by {data.period.locked_by} · {new Date(data.period.locked_at).toLocaleDateString('en-GB')}</span>
             ) : periodId === data.periods.find(p => !p.locked_at)?.id ? (
-              <>
-                <button className="lockbtn spool" disabled={spooling} onClick={doSpool} title="Scan current grades for any 3 or 4 and create a project for it, with a suggested solution — doesn't freeze anyone's scoring">
-                  {spooling ? 'Spooling…' : 'Spool projects'}
-                </button>
-                <button className="lockbtn" onClick={() => setLockDialog('confirm')}>Lock this SAR</button>
-              </>
+              <button className="lockbtn" onClick={() => setLockDialog('confirm')}>Lock this SAR</button>
             ) : null}
           </span>
         </div>
       </header>
       <nav className="tabs">
-        {[['activity', 'This Week'], ['qip', 'SAR'], ['discuss', `Items to Discuss${potentialCount ? ` (${potentialCount})` : ''}`], ['projects', 'Excellence Projects'], ['meetings', 'Meetings']].map(([k, l]) => (
-          <button key={k} className={tab === k ? 'active' : ''} onClick={() => { setTab(k); setAreaView(null); }}>{l}</button>
+        {[['activity', 'This Week'], ['qip', 'SAR'], ['projects', 'Excellence Projects'], ['meetings', 'Meetings']].map(([k, l]) => (
+          <button key={k} className={tab === k ? 'active' : ''} onClick={() => { setTab(k); setAreaView(null); setCriterionView(null); }}>{l}</button>
         ))}
       </nav>
       <div className="wrap">
@@ -182,13 +164,14 @@ function Dashboard({ me, onLeave }) {
             <button onClick={startNextPeriod}>Start {nextPeriod(data.period).label}</button>
           </div>
         )}
-        {areaView
-          ? <AreaPage scope={areaView.scope} id={areaView.id} data={data} onBack={() => setAreaView(null)} onOpenCase={setCaseFileId} />
+        {criterionView
+          ? <CriterionPage {...criterionView} data={data} me={me} onBack={() => setCriterionView(null)} onOpenCase={setCaseFileId} onRefresh={refresh} />
+          : areaView
+          ? <AreaPage scope={areaView.scope} id={areaView.id} data={data} onBack={() => setAreaView(null)} onOpenCase={setCaseFileId} onOpenCriterion={openCriterion} />
           : <>
             {tab === 'qip' && <Qip data={data} me={me} myKey={myKey} onScore={score} canEdit={canEdit}
-              projectsByCell={projectsByCell} onOpenArea={setAreaView} onOpenCase={setCaseFileId} />}
+              liveCountByCell={liveCountByCell} onOpenArea={openArea} onOpenCriterion={openCriterion} onOpenCase={setCaseFileId} />}
             {tab === 'projects' && <ProjectsTab data={data} me={me} onRefresh={refresh} onOpenCase={setCaseFileId} />}
-            {tab === 'discuss' && <DiscussTab data={data} me={me} onRefresh={refresh} onOpenCase={setCaseFileId} onGoToProjects={() => setTab('projects')} onGoToMeetings={() => setTab('meetings')} />}
             {tab === 'meetings' && <MeetingsTab data={data} me={me} onOpenCase={setCaseFileId} />}
             {tab === 'activity' && <ActivityTab data={data} onOpenCase={setCaseFileId} />}
           </>}
@@ -205,10 +188,9 @@ function LockDialog({ state, data, onConfirm, onClose, onResolve }) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <h3>Lock this SAR?</h3>
-        <p className="muted">This is the final step, not the routine one — use "Spool projects" for generating
-          projects while you're still scoring. Locking freezes every grade for <b>both</b> reviewers this period,
-          including Fleur's. After locking, no cell is clickable and the wording each grade was judged against is
-          snapshotted permanently. This cannot be undone — the next period opens fresh drafts.</p>
+        <p className="muted">This is the final step. Locking freezes every grade for <b>both</b> reviewers this
+          period, including Fleur's. After locking, no cell is clickable and the wording each grade was judged
+          against is snapshotted permanently. This cannot be undone — the next period opens fresh drafts.</p>
         <div className="modal-actions">
           <button onClick={onClose}>Cancel</button>
           <button className="danger" onClick={onConfirm}>Yes, lock it</button>
@@ -236,24 +218,27 @@ function LockDialog({ state, data, onConfirm, onClose, onResolve }) {
 function BlockerRow({ cell, data, onResolve }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const existing = data.projects.find(p => projectCellKey(p) === cell.key && OPEN_STATUSES.includes(p.status));
+  const [owner, setOwner] = useState('');
+  const existing = data.projects.find(p => projectCellKey(p) === cell.key && OPEN_STATUSES.includes(p.status) && !p.archived_at);
   const critName = cell.scope === 'unit'
     ? data.criteria.find(c => c.id === cell.criterion_id)?.name
     : data.ocrit.find(c => c.id === cell.criterion_id)?.name;
   const areaName = cell.scope === 'unit'
     ? data.units.find(u => u.id === cell.unit_id)?.name
     : data.ofuncs.find(f => f.id === cell.function_id)?.name;
+  const known = [...new Set([...REVIEWERS.map(r => r.name), ...data.projects.map(p => p.owner).filter(Boolean)])];
   const act = async () => {
+    if (!owner.trim()) { setError('An owner is required.'); return; }
     setBusy(true); setError('');
     try {
       // A 4 blocking the lock needs action right now — defaults to Rapid Fix.
-      if (existing) await promoteLive(existing.id, 'rapid', data.period);
+      if (existing) await promoteLive(existing.id, 'rapid', data.period, { owner: owner.trim() });
       else await addProject({
         title: `${critName} — ${areaName}`, scope: cell.scope,
         unit_id: cell.scope === 'unit' ? cell.unit_id : null,
         function_id: cell.scope === 'org' ? cell.function_id : null,
         criterion_id: cell.criterion_id, status: 'live', grade_at_creation: 4,
-        pace: 'rapid', due: autoTarget('rapid', data.period),
+        pace: 'rapid', due: autoTarget('rapid', data.period), owner: owner.trim(),
       });
       await onResolve();
     } catch (e) { setError(friendlyProjectError(e)); }
@@ -262,6 +247,9 @@ function BlockerRow({ cell, data, onResolve }) {
   return (
     <li>
       <b>{areaName}</b> — {critName} (graded 4){error && <div className="muted" style={{ color: 'var(--g4)' }}>{error}</div>}
+      <input className="formctl" list={`blocker-owners-${cell.key}`} placeholder="owner (required)"
+        value={owner} onChange={e => setOwner(e.target.value)} style={{ width: 140, marginLeft: '.4rem' }} />
+      <datalist id={`blocker-owners-${cell.key}`}>{known.map(n => <option key={n} value={n} />)}</datalist>
       <button disabled={busy} onClick={act}>{existing ? 'Promote to live' : 'Create & make live'}</button>
     </li>
   );

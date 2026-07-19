@@ -3,8 +3,8 @@ import { startMeeting, endMeeting, loadMeetings, updateMeeting, deleteMeeting } 
 import { fmtDate, overdueBy } from './util';
 import { useConfirm } from './Dialogs';
 
-const KIND_LABEL = { qip: 'Fleur - QIP meeting', project: 'Project meeting' };
-const KIND_CLASS = { qip: 'st-fix', project: 'st-embed' };
+const KIND_LABEL = { qip: 'Fleur - QIP meeting', project: 'Project meeting', criterion: 'Criterion meeting' };
+const KIND_CLASS = { qip: 'st-fix', project: 'st-embed', criterion: 'st-hold' };
 
 export default function MeetingsTab({ data, me, onOpenCase }) {
   const [agenda, setAgenda] = useState(null);
@@ -14,6 +14,9 @@ export default function MeetingsTab({ data, me, onOpenCase }) {
   const [supported, setSupported] = useState(true);
   const [kind, setKind] = useState('qip');
   const [projectId, setProjectId] = useState('');
+  const [critScope, setCritScope] = useState('unit');
+  const [critAreaId, setCritAreaId] = useState('');
+  const [critId, setCritId] = useState('');
   const [past, setPast] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const recRef = useRef(null);
@@ -31,16 +34,26 @@ export default function MeetingsTab({ data, me, onOpenCase }) {
     if (transcript.length) localStorage.setItem('petxi-meeting-draft', JSON.stringify(transcript));
   }, [transcript]);
 
+  const critOptions = critScope === 'unit'
+    ? data.criteria.filter(c => !c.unit_id || c.unit_id === critAreaId)
+    : data.ocrit;
+
   const prepareMeeting = () => {
-    const potentials = data.projects.filter(p => p.status === 'potential')
-      .sort((a, b) => (b.grade_at_creation || 0) - (a.grade_at_creation || 0));
-    const overdueP = data.projects.filter(p => p.due && overdueBy(p.due) && ['live', 'paused'].includes(p.status));
-    setAgenda({ potentials, overdueP });
+    const overdueP = data.projects.filter(p => !p.archived_at && p.due && overdueBy(p.due) && ['live', 'paused'].includes(p.status));
+    setAgenda({ overdueP });
   };
 
+  const readyToRecord = kind === 'qip' || (kind === 'project' && projectId) || (kind === 'criterion' && critAreaId && critId);
+
   const startRec = async () => {
-    if (kind === 'project' && !projectId) return;
-    const m = await startMeeting(me, data.period?.id, { kind, project_id: kind === 'project' ? Number(projectId) : null });
+    if (!readyToRecord) return;
+    const m = await startMeeting(me, data.period?.id, {
+      kind,
+      project_id: kind === 'project' ? Number(projectId) : null,
+      criterion: kind === 'criterion'
+        ? { scope: critScope, unit_id: critScope === 'unit' ? critAreaId : null, function_id: critScope === 'org' ? critAreaId : null, criterion_id: critId }
+        : null,
+    });
     setMeeting(m);
     setTranscript([]);
     setRecording(true);
@@ -85,27 +98,46 @@ export default function MeetingsTab({ data, me, onOpenCase }) {
     <>
       <div className="panel-h"><span className="bar" style={{ background: 'var(--g3)' }} />Meetings</div>
       <p className="muted" style={{ marginBottom: '.8rem' }}>
-        Record a <b>Fleur - QIP meeting</b> for general review, or an <b>individual project meeting</b> linked to
-        one project. When Claude's written up the minutes from the transcript, paste them back in on that
-        meeting's row below.
+        Record a <b>Fleur - QIP meeting</b> for general review, an <b>individual project meeting</b> linked to one
+        project, or a <b>criterion meeting</b> — for discussing root cause before any project exists yet. When
+        Claude's written up the minutes from the transcript, paste them back in on that meeting's row below.
       </p>
       <div className="card">
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '.8rem' }}>
-          <select className="formctl" value={kind} onChange={e => { setKind(e.target.value); setProjectId(''); }} disabled={recording}>
+          <select className="formctl" value={kind}
+            onChange={e => { setKind(e.target.value); setProjectId(''); setCritAreaId(''); setCritId(''); }} disabled={recording}>
             <option value="qip">Fleur - QIP meeting</option>
             <option value="project">Individual project meeting</option>
+            <option value="criterion">Criterion meeting</option>
           </select>
           {kind === 'project' && (
             <select className="formctl" value={projectId} onChange={e => setProjectId(e.target.value)} disabled={recording}>
               <option value="">— pick project —</option>
-              {data.projects.filter(p => p.status !== 'cancelled').map(p => (
+              {data.projects.filter(p => !p.archived_at && p.status !== 'cancelled').map(p => (
                 <option key={p.id} value={p.id}>{p.title}</option>
               ))}
             </select>
           )}
+          {kind === 'criterion' && (
+            <>
+              <select className="formctl" value={critScope}
+                onChange={e => { setCritScope(e.target.value); setCritAreaId(''); setCritId(''); }} disabled={recording}>
+                <option value="unit">Business unit</option>
+                <option value="org">Org function</option>
+              </select>
+              <select className="formctl" value={critAreaId} onChange={e => { setCritAreaId(e.target.value); setCritId(''); }} disabled={recording}>
+                <option value="">— area —</option>
+                {(critScope === 'unit' ? data.units : data.ofuncs).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+              <select className="formctl" value={critId} onChange={e => setCritId(e.target.value)} disabled={recording || !critAreaId}>
+                <option value="">— criterion —</option>
+                {critOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </>
+          )}
           <button onClick={prepareMeeting}>Prepare meeting</button>
           {!recording
-            ? <button onClick={startRec} disabled={kind === 'project' && !projectId}>● Record</button>
+            ? <button onClick={startRec} disabled={!readyToRecord}>● Record</button>
             : <button className="danger" onClick={stopRec}>■ Stop &amp; save</button>}
           <button onClick={() => copyForClaude(transcript)} disabled={!transcript.length}>Copy for Claude</button>
         </div>
@@ -116,15 +148,6 @@ export default function MeetingsTab({ data, me, onOpenCase }) {
         {agenda && (
           <div style={{ marginTop: '.8rem' }}>
             <h4>Agenda</h4>
-            <p><b>Potentials, worst first:</b></p>
-            <ul>
-              {agenda.potentials.map(p => (
-                <li key={p.id}>
-                  <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button> — graded {p.grade_at_creation}
-                </li>
-              ))}
-              {!agenda.potentials.length && <li className="muted">None.</li>}
-            </ul>
             <p><b>Overdue:</b></p>
             <ul>
               {agenda.overdueP.map(p => <li key={p.id}>{p.title} — due {fmtDate(p.due)}</li>)}
@@ -161,7 +184,16 @@ function MeetingRow({ m, data, expanded, onToggle, onOpenCase, onCopy, onChanged
   const [error, setError] = useState('');
   const [askConfirm, confirmDialog] = useConfirm();
   const project = m.project_id ? data.projects.find(p => p.id === m.project_id) : null;
-  const label = m.title || (m.kind === 'project' ? (project ? `Project meeting — ${project.title}` : 'Project meeting') : KIND_LABEL.qip);
+  const critArea = m.kind === 'criterion'
+    ? (m.scope === 'unit' ? data.units.find(u => u.id === m.unit_id) : data.ofuncs.find(f => f.id === m.function_id))
+    : null;
+  const critName = m.kind === 'criterion'
+    ? (m.scope === 'unit' ? data.criteria.find(c => c.id === m.criterion_id) : data.ocrit.find(c => c.id === m.criterion_id))?.name
+    : null;
+  const label = m.title || (
+    m.kind === 'project' ? (project ? `Project meeting — ${project.title}` : 'Project meeting')
+    : m.kind === 'criterion' ? `Criterion meeting — ${critArea?.name || m.unit_id || m.function_id} > ${critName || m.criterion_id}`
+    : KIND_LABEL.qip);
 
   const save = async () => {
     setBusy(true); setError('');
@@ -182,7 +214,7 @@ function MeetingRow({ m, data, expanded, onToggle, onOpenCase, onCopy, onChanged
         <button className="linklike" onClick={onToggle}>
           {new Date(m.started_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} — {label}
         </button>
-        <span className={`st ${KIND_CLASS[m.kind] || 'st-fix'}`}>{m.kind === 'project' ? 'Project' : 'QIP'}</span>
+        <span className={`st ${KIND_CLASS[m.kind] || 'st-fix'}`}>{m.kind === 'project' ? 'Project' : m.kind === 'criterion' ? 'Criterion' : 'QIP'}</span>
         {m.minutes && <span className="muted" style={{ fontSize: '.74rem' }}>📝 minutes added</span>}
         <span className="muted" style={{ fontSize: '.74rem' }}>
           {(m.transcript || []).length} line{(m.transcript || []).length === 1 ? '' : 's'}

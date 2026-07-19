@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { supa, REVIEWERS } from './supa';
 import { loadNotes, addNote, editNote, promoteLive, pauseProject, resumeLive,
-  moveBackLive, completeProject, cancelProject, updateCurrentGrade, loadMeetingsForProject } from './data';
+  moveBackLive, completeProject, cancelProject, updateCurrentGrade, loadMeetingsForProject,
+  archiveProject, unarchiveProject } from './data';
 import { PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
   friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, gradeMovement } from './util';
 import EditableText from './EditableText';
 import { OwnerEditor, ScheduleEditor, AreaEditor } from './ProjectControls';
-import { usePrompt } from './Dialogs';
+import { usePrompt, useConfirm } from './Dialogs';
 import ProjectDocuments from './Documents';
 import ProjectLinks from './ProjectLinks';
 
@@ -52,6 +53,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   const [actionError, setActionError] = useState('');
   const [copied, setCopied] = useState(false);
   const [askText, textDialog] = usePrompt();
+  const [askConfirm, confirmDialog] = useConfirm();
 
   const project = data.projects.find(p => p.id === projectId);
 
@@ -113,6 +115,11 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
     if (!reason) return;
     await act(cancelProject, project.id, reason);
   };
+  const archive = async () => {
+    const ok = await askConfirm('Archive this project? It stops showing up anywhere by default (and stops counting toward its criterion\'s live-project total), but nothing is deleted — you can bring it back any time.', { confirmLabel: 'Archive', danger: true });
+    if (!ok) return;
+    await act(archiveProject, project.id);
+  };
   const submitNote = async e => {
     e.preventDefault();
     if (!noteBody.trim()) return;
@@ -138,6 +145,14 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
       <div className="modal casefile" onClick={e => e.stopPropagation()}>
         <button className="modalclose" onClick={onClose}>×</button>
         <h3><EditableText table="projects" id={project.id} field="title" value={project.title} onSaved={onRefresh} /></h3>
+
+        {project.archived_at && (
+          <div className="card" style={{ borderColor: 'var(--g4)', marginBottom: '.8rem' }}>
+            Archived {new Date(project.archived_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} —
+            hidden by default and not counted as running.{' '}
+            <button className="btn" disabled={busy} onClick={() => act(unarchiveProject, project.id)}>Unarchive</button>
+          </div>
+        )}
 
         <div className="casefile-meta">
           <AreaEditor project={project} data={data} onSaved={onRefresh} />
@@ -182,6 +197,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
           {project.status === 'completed' && <button className="btn" disabled={busy} onClick={() => act(moveBackLive, project.id)}>Moved back — regressed to live</button>}
           {['potential', 'queued', 'live', 'paused'].includes(project.status) &&
             <button className="btn danger" disabled={busy} onClick={cancel}>Cancel</button>}
+          {!project.archived_at && <button className="btn danger" disabled={busy} onClick={archive}>Archive</button>}
         </div>
         {actionError && <p className="muted" style={{ color: 'var(--g4)' }}>{actionError}</p>}
 
@@ -256,6 +272,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
         </form>
       </div>
       {textDialog}
+      {confirmDialog}
     </div>
   );
 }

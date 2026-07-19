@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { REVIEWERS } from './supa';
 import { addProject } from './data';
-import { STATUS_LABEL, PACE_LABEL, statusBadge, statusSortKey, fmtDate, overdueBy, daysInStage, isOverStageLimit, gradeMovement } from './util';
+import { STATUS_LABEL, PACE_LABEL, statusBadge, statusSortKey, fmtDate, overdueBy, daysInStage, isOverStageLimit, gradeMovement, autoTarget } from './util';
 import { OwnerEditor, ImpactEditor, TargetEditor, StatusMenu } from './ProjectControls';
 import EditableText from './EditableText';
 
@@ -68,7 +69,10 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
   const toggleSort = key => setSort(s => s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
 
   const periodStart = data.period ? new Date(data.period.starts) : null;
+  const activeCount = data.projects.filter(p => !p.archived_at).length;
   const rows = data.projects.filter(p => {
+    if (filters.has('Archived')) return !!p.archived_at;
+    if (p.archived_at) return false;
     if (!filters.size) return true;
     for (const f of filters) {
       if (STATUSES.includes(f) && p.status === f) return true;
@@ -91,7 +95,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
   return (
     <>
       <div className="panel-h" style={{ justifyContent: 'space-between', display: 'flex' }}>
-        <span><span className="bar" style={{ background: 'var(--g1)' }} />Excellence Projects List — {data.projects.length} projects</span>
+        <span><span className="bar" style={{ background: 'var(--g1)' }} />Excellence Projects List — {activeCount} projects</span>
         <button onClick={() => setShowAdd(s => !s)}>{showAdd ? 'Cancel' : '+ Add project'}</button>
       </div>
       <p className="muted" style={{ marginBottom: '.6rem' }}>
@@ -110,7 +114,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
             {pc.label}
           </button>
         ))}
-        {['Overdue', 'New this period', 'Mine', 'Improved', 'Slipped'].map(f => (
+        {['Overdue', 'New this period', 'Mine', 'Improved', 'Slipped', 'Archived'].map(f => (
           <button key={f} className={`fchip ${filters.has(f) ? 'active' : ''}`} onClick={() => toggle(f)}>
             {f}
           </button>
@@ -180,14 +184,20 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
   );
 }
 
+// Goes straight to live — no more discuss/potential holding stage. Owner
+// and pace (and so a date) are both required at creation, same rule as
+// adding a project from a criterion's own page.
 function AddProjectForm({ data, me, onDone }) {
   const [scope, setScope] = useState('unit');
   const [areaId, setAreaId] = useState('');
   const [criterionId, setCriterionId] = useState('');
   const [title, setTitle] = useState('');
+  const [pace, setPace] = useState('rapid');
+  const [owner, setOwner] = useState('');
   const [impact, setImpact] = useState('A');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const known = [...new Set([...REVIEWERS.map(r => r.name), ...data.projects.map(p => p.owner).filter(Boolean)])];
 
   const critOptions = scope === 'unit'
     ? data.criteria.filter(c => !c.unit_id || c.unit_id === areaId)
@@ -195,19 +205,22 @@ function AddProjectForm({ data, me, onDone }) {
 
   const submit = async e => {
     e.preventDefault();
-    if (!areaId || !criterionId || !title) { setError('Area, criterion and title are required.'); return; }
+    if (!areaId || !criterionId || !title.trim() || !owner.trim()) {
+      setError('Area, criterion, title and owner are all required.'); return;
+    }
     setBusy(true); setError('');
     try {
-      // Every project starts life in Items to Discuss, manual or spooled —
-      // owner, pace and target all get decided there, not at creation.
+      const scoreRows = scope === 'unit' ? data.scores : data.oscores;
+      const relevant = scoreRows.filter(s => s.criterion_id === criterionId &&
+        (scope === 'unit' ? s.unit_id === areaId : s.function_id === areaId));
+      const grade = relevant.length ? Math.max(...relevant.map(s => s.score)) : null;
       await addProject({
-        title, scope,
+        title: title.trim(), scope,
         unit_id: scope === 'unit' ? areaId : null,
         function_id: scope === 'org' ? areaId : null,
         criterion_id: criterionId,
-        status: 'potential',
-        impact,
-        suggested_solution: 'Claude integration coming soon — draft the starting plan here.',
+        status: 'live', pace, owner: owner.trim(), impact,
+        due: autoTarget(pace, data.period), grade_at_creation: grade,
       });
       onDone();
     } catch (e) { setError(e.message); } finally { setBusy(false); }
@@ -231,13 +244,20 @@ function AddProjectForm({ data, me, onDone }) {
       </div>
       <input placeholder="Project title" value={title} onChange={e => setTitle(e.target.value)}
         style={{ width: '100%', marginBottom: '.6rem', padding: '.4rem' }} required />
-      <select value={impact} onChange={e => setImpact(e.target.value)} style={{ marginBottom: '.6rem' }}>
-        <option value="G">Impact: high (G)</option>
-        <option value="A">Impact: medium (A)</option>
-        <option value="R">Impact: low (R)</option>
-      </select>
+      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.6rem' }}>
+        <select value={pace} onChange={e => setPace(e.target.value)}>
+          {['rapid', 'short', 'mid', 'long'].map(p => <option key={p} value={p}>{PACE_LABEL[p]}</option>)}
+        </select>
+        <input list="add-project-owners" placeholder="owner (required)" value={owner} onChange={e => setOwner(e.target.value)} />
+        <datalist id="add-project-owners">{known.map(n => <option key={n} value={n} />)}</datalist>
+        <select value={impact} onChange={e => setImpact(e.target.value)}>
+          <option value="G">Impact: high (G)</option>
+          <option value="A">Impact: medium (A)</option>
+          <option value="R">Impact: low (R)</option>
+        </select>
+      </div>
       {error && <p className="muted" style={{ color: 'var(--g4)' }}>{error}</p>}
-      <button disabled={busy}>Add to Items to Discuss</button>
+      <button disabled={busy}>Add — goes live immediately</button>
     </form>
   );
 }

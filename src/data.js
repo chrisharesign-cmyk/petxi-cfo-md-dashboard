@@ -70,21 +70,18 @@ function descriptorFor(crit, unitId) {
 }
 
 async function loadForPeriod(periodId) {
-  const [criteriaR, ocritR, scoresR, oscoresR, projectsR, unitsR, ofuncsR] = await Promise.all([
+  const [criteriaR, ocritR, scoresR, oscoresR, projectsR] = await Promise.all([
     supa.from('criteria').select('*'),
     supa.from('org_criteria').select('*'),
     supa.from('scores').select('*').eq('period_id', periodId),
     supa.from('org_scores').select('*').eq('period_id', periodId),
     supa.from('projects').select('*'),
-    supa.from('units').select('*'),
-    supa.from('org_functions').select('*'),
   ]);
-  const err = [criteriaR, ocritR, scoresR, oscoresR, projectsR, unitsR, ofuncsR].find(r => r.error);
+  const err = [criteriaR, ocritR, scoresR, oscoresR, projectsR].find(r => r.error);
   if (err) throw err.error;
   return {
     criteria: criteriaR.data, ocrit: ocritR.data,
     scores: scoresR.data, oscores: oscoresR.data, projects: projectsR.data,
-    units: unitsR.data, ofuncs: ofuncsR.data,
   };
 }
 
@@ -105,70 +102,25 @@ function worstGrades(scores, oscores) {
   return worst;
 }
 
-// §4.2 — one potential per cell-key graded 3 or 4 with no open project yet,
-// carrying that criterion's suggested solution. Safe to call repeatedly:
-// only ever fills gaps, never duplicates or touches existing projects.
-async function generatePotentials(worst, projects, critById, ocritById, unitById, ofuncById) {
-  const openKeys = new Set(projects.filter(p => OPEN_STATUSES.includes(p.status)).map(projectCellKey));
-  const toCreate = Object.entries(worst)
-    .filter(([key, w]) => w.grade >= 3 && !openKeys.has(key))
-    .map(([key, w]) => {
-      const crit = w.scope === 'unit' ? critById[w.criterion_id] : ocritById[w.criterion_id];
-      const areaName = w.scope === 'unit' ? unitById[w.unit_id]?.name || w.unit_id : ofuncById[w.function_id]?.name || w.function_id;
-      return {
-        title: `${crit?.name || w.criterion_id} — ${areaName}`,
-        scope: w.scope,
-        unit_id: w.scope === 'unit' ? w.unit_id : null,
-        function_id: w.scope === 'org' ? w.function_id : null,
-        criterion_id: w.criterion_id,
-        status: 'potential',
-        grade_at_creation: w.grade,
-        suggested_solution: crit?.solution || 'Claude integration coming soon — draft the starting plan here.',
-      };
-    });
-  if (toCreate.length) {
-    const { error } = await supa.from('projects').insert(toCreate);
-    if (error) throw error;
-  }
-  return toCreate.length;
-}
-
-// Lightweight, non-freezing action: scan current draft grades and spool out
-// potential projects for any 3 or 4 that doesn't already have one, with
-// suggested solutions attached. Doesn't touch locked_at — both reviewers
-// can keep scoring right through it, and it's safe to run again later.
-export async function spoolProjects(periodId) {
-  const { criteria, ocrit, scores, oscores, projects, units, ofuncs } = await loadForPeriod(periodId);
-  const critById = Object.fromEntries(criteria.map(c => [c.id, c]));
-  const ocritById = Object.fromEntries(ocrit.map(c => [c.id, c]));
-  const unitById = Object.fromEntries(units.map(u => [u.id, u]));
-  const ofuncById = Object.fromEntries(ofuncs.map(f => [f.id, f]));
-  const worst = worstGrades(scores, oscores);
-  const created = await generatePotentials(worst, projects, critById, ocritById, unitById, ofuncById);
-  return { created };
-}
-
 // The final, explicit lock action. Returns { blocked: true, cells: [...] }
-// if any 4-graded cell has no live project, otherwise performs the lock:
-// snapshots wording, spools any remaining potentials, freezes both
-// reviewers, stamps locked_at/locked_by. One-way — use spoolProjects()
-// for the routine "generate projects as we go" pass instead.
+// if any 4-graded cell has no live project, otherwise snapshots wording and
+// freezes both reviewers. Projects are no longer auto-spooled on lock —
+// every criterion has its own always-visible page now (root cause +
+// projects), so there's no gap for a placeholder project to fill.
 export async function lockPeriod(periodId, lockedBy) {
-  const { criteria, ocrit, scores, oscores, projects, units, ofuncs } = await loadForPeriod(periodId);
+  const { criteria, ocrit, scores, oscores, projects } = await loadForPeriod(periodId);
   const critById = Object.fromEntries(criteria.map(c => [c.id, c]));
   const ocritById = Object.fromEntries(ocrit.map(c => [c.id, c]));
-  const unitById = Object.fromEntries(units.map(u => [u.id, u]));
-  const ofuncById = Object.fromEntries(ofuncs.map(f => [f.id, f]));
-  const liveKeys = new Set(projects.filter(p => p.status === 'live').map(projectCellKey));
+  const liveKeys = new Set(projects.filter(p => p.status === 'live' && !p.archived_at).map(projectCellKey));
   const worst = worstGrades(scores, oscores);
 
-  // 2.4 — block lock if any 4 has no live project linked to its cell-key
+  // block lock if any 4 has no live project linked to its cell-key
   const blockers = Object.entries(worst)
     .filter(([key, w]) => w.grade === 4 && !liveKeys.has(key))
     .map(([key, w]) => ({ key, ...w }));
   if (blockers.length) return { blocked: true, cells: blockers };
 
-  // 2.5 — snapshot descriptor wording for every scored cell this period
+  // snapshot descriptor wording for every scored cell this period
   await Promise.all([
     ...scores.map(s => {
       const c = critById[s.criterion_id];
@@ -182,13 +134,11 @@ export async function lockPeriod(periodId, lockedBy) {
     }).filter(Boolean),
   ]);
 
-  const created = await generatePotentials(worst, projects, critById, ocritById, unitById, ofuncById);
-
   const { error: lockErr } = await supa.from('sar_periods')
     .update({ locked_at: new Date().toISOString(), locked_by: lockedBy })
     .eq('id', periodId);
   if (lockErr) throw lockErr;
-  return { blocked: false, created };
+  return { blocked: false };
 }
 
 // ---- projects: human-only transitions, never destroyed ----
@@ -247,6 +197,20 @@ export async function updateCurrentGrade(id, grade) {
   if (error) throw error;
 }
 
+// "Deleting" a project archives it instead — nothing is destroyed, it just
+// stops showing up by default (and stops counting toward a criterion's
+// live-project count). Reversible.
+export async function archiveProject(id) {
+  const { error } = await supa.from('projects')
+    .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+export async function unarchiveProject(id) {
+  const { error } = await supa.from('projects')
+    .update({ archived_at: null, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+
 // Everything that happened in the last `days` days, across every audited
 // table, for the Activity tab.
 export async function loadRecentActivity(days = 7) {
@@ -273,11 +237,19 @@ export async function editNote(oldNote, newBody) {
 }
 
 // ---- meetings ----
-// kind: 'qip' (Fleur - QIP meeting, general) or 'project' (must carry project_id) —
-// chosen before recording starts, enforced by a DB check constraint.
-export async function startMeeting(started_by, period_id, { kind = 'qip', project_id = null, title = null } = {}) {
+// kind: 'qip' (Fleur - QIP meeting, general), 'project' (carries project_id),
+// or 'criterion' (carries scope/unit_id or function_id/criterion_id — for
+// discussing root cause before any project exists yet) — chosen before
+// recording starts, enforced by a DB check constraint.
+export async function startMeeting(started_by, period_id, { kind = 'qip', project_id = null, title = null, criterion = null } = {}) {
   const { data, error } = await supa.from('meetings')
-    .insert({ started_by, period_id, kind, project_id, title }).select().single();
+    .insert({
+      started_by, period_id, kind, project_id, title,
+      scope: criterion?.scope ?? null,
+      unit_id: criterion?.scope === 'unit' ? criterion.unit_id : null,
+      function_id: criterion?.scope === 'org' ? criterion.function_id : null,
+      criterion_id: criterion?.criterion_id ?? null,
+    }).select().single();
   if (error) throw error;
   return data;
 }
@@ -316,6 +288,13 @@ export async function loadMeetingsForProject(projectId) {
   if (error) throw error;
   return data;
 }
+export async function loadMeetingsForCriterion(scope, unit_id, function_id, criterion_id) {
+  let q = supa.from('meetings').select('*').eq('scope', scope).eq('criterion_id', criterion_id).not('ended_at', 'is', null);
+  q = scope === 'unit' ? q.eq('unit_id', unit_id) : q.eq('function_id', function_id);
+  const { data, error } = await q.order('started_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
 
 // ---- project links: "also affects" tags beyond a project's primary home ----
 export async function loadProjectLinks(projectId) {
@@ -335,6 +314,28 @@ export async function addProjectLink(projectId, { scope, unit_id, function_id, c
 export async function removeProjectLink(id) {
   const { error } = await supa.from('project_links').delete().eq('id', id);
   if (error) throw error;
+}
+
+// ---- root cause: one living record per criterion, why it scores the way it does ----
+export async function loadRootCause(scope, unit_id, function_id, criterion_id) {
+  let q = supa.from('root_causes').select('*').eq('scope', scope).eq('criterion_id', criterion_id);
+  q = scope === 'unit' ? q.eq('unit_id', unit_id) : q.eq('function_id', function_id);
+  const { data, error } = await q.maybeSingle();
+  if (error) throw error;
+  return data;
+}
+export async function saveRootCause({ id, scope, unit_id, function_id, criterion_id, body, updatedBy }) {
+  if (id) {
+    const { error } = await supa.from('root_causes')
+      .update({ body, updated_by: updatedBy, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+  } else {
+    const { error } = await supa.from('root_causes').insert({
+      scope, unit_id: scope === 'unit' ? unit_id : null, function_id: scope === 'org' ? function_id : null,
+      criterion_id, body, updated_by: updatedBy,
+    });
+    if (error) throw error;
+  }
 }
 
 // ---- project documents: PDF attachments, on any project ----
@@ -388,6 +389,20 @@ export async function periodMeans(scope, id) {
   const col = scope === 'unit' ? 'unit_id' : 'function_id';
   const table = scope === 'unit' ? 'scores' : 'org_scores';
   const { data, error } = await supa.from(table).select(`period_id, score`).eq(col, id);
+  if (error) throw error;
+  const byPeriod = {};
+  data.forEach(r => { (byPeriod[r.period_id] ||= []).push(r.score); });
+  return Object.entries(byPeriod).map(([period_id, arr]) =>
+    ({ period_id, mean: arr.reduce((a, b) => a + b, 0) / arr.length }));
+}
+
+// Same as periodMeans but narrowed to one criterion — the trend line on a
+// CriterionPage, one row instead of a whole area.
+export async function periodMeansForCriterion(scope, unitOrFunctionId, criterionId) {
+  const col = scope === 'unit' ? 'unit_id' : 'function_id';
+  const table = scope === 'unit' ? 'scores' : 'org_scores';
+  const { data, error } = await supa.from(table).select('period_id, score')
+    .eq(col, unitOrFunctionId).eq('criterion_id', criterionId);
   if (error) throw error;
   const byPeriod = {};
   data.forEach(r => { (byPeriod[r.period_id] ||= []).push(r.score); });
