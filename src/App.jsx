@@ -182,7 +182,7 @@ function Dashboard({ me, onLeave }) {
               liveCountByCell={liveCountByCell} onOpenArea={openArea} onOpenCriterion={openCriterion} onOpenCase={setCaseFileId} />}
             {tab === 'agree' && <AgreeScores data={data} me={me} canEdit={canEdit} onRefresh={refresh} />}
             {tab === 'projects' && <ProjectsTab data={data} me={me} onRefresh={refresh} onOpenCase={setCaseFileId} />}
-            {tab === 'meetings' && <MeetingsTab data={data} me={me} onOpenCase={setCaseFileId} onOpenCriterion={openCriterion} onRefresh={refresh} />}
+            {tab === 'meetings' && <MeetingsTab data={data} me={me} onRefresh={refresh} />}
             {tab === 'activity' && <ActivityTab data={data} onOpenCase={setCaseFileId} />}
           </>}
       </div>
