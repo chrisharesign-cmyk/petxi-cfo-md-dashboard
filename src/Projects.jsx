@@ -61,12 +61,22 @@ function critName(p, data) {
     : data.ocrit.find(c => c.id === p.criterion_id)?.name;
 }
 
+const SORT_KEY = 'qip:projects:sort';
+const loadSort = () => {
+  try { return JSON.parse(localStorage.getItem(SORT_KEY)) || { key: 'stage', dir: 'desc' }; }
+  catch { return { key: 'stage', dir: 'desc' }; }
+};
+
 export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
   const [filters, setFilters] = useState(new Set());
   const [showAdd, setShowAdd] = useState(false);
-  const [sort, setSort] = useState({ key: 'stage', dir: 'desc' });
+  const [sort, setSort] = useState(loadSort);
   const toggle = f => setFilters(s => { const n = new Set(s); n.has(f) ? n.delete(f) : n.add(f); return n; });
-  const toggleSort = key => setSort(s => s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' });
+  const toggleSort = key => setSort(s => {
+    const next = s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' };
+    try { localStorage.setItem(SORT_KEY, JSON.stringify(next)); } catch { /* private browsing etc — sort just won't persist */ }
+    return next;
+  });
 
   const periodStart = data.period ? new Date(data.period.starts) : null;
   const activeCount = data.projects.filter(p => !p.archived_at).length;

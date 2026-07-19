@@ -12,11 +12,14 @@ import { usePrompt } from './Dialogs';
 export function OwnerEditor({ project, data, onSaved }) {
   const [value, setValue] = useState(project.owner || '');
   const [editing, setEditing] = useState(false);
+  const [error, setError] = useState('');
   const known = [...new Set([...REVIEWERS.map(r => r.name), ...data.projects.map(p => p.owner).filter(Boolean)])];
 
   const save = async () => {
-    const { error } = await supa.from('projects').update({ owner: value || null, updated_at: new Date().toISOString() }).eq('id', project.id);
-    if (!error) { setEditing(false); onSaved?.(); }
+    setError('');
+    const { error: err } = await supa.from('projects').update({ owner: value.trim() || null, updated_at: new Date().toISOString() }).eq('id', project.id);
+    if (err) { setError(friendlyProjectError(err)); return; }
+    setEditing(false); onSaved?.();
   };
 
   if (!editing) {
@@ -29,10 +32,12 @@ export function OwnerEditor({ project, data, onSaved }) {
   return (
     <span className="editform" onClick={e => e.stopPropagation()}>
       <input list={`owners-${project.id}`} value={value} onChange={e => setValue(e.target.value)} autoFocus
+        onFocus={e => e.target.select()}
         onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }} />
       <datalist id={`owners-${project.id}`}>{known.map(n => <option key={n} value={n} />)}</datalist>
       <button onClick={save}>Save</button>
       <button type="button" onClick={() => setEditing(false)}>Cancel</button>
+      {error && <span className="muted" style={{ color: 'var(--g4)', display: 'block', width: '100%' }}>{error}</span>}
     </span>
   );
 }

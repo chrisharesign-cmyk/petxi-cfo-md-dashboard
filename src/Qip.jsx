@@ -10,6 +10,16 @@ function critTip(c) {
   return onTarget ? `${c.name} — ${onTarget}` : c.name;
 }
 
+// Plain-English gloss for each horizontal category — the column names are
+// short shorthand, so a one-line "what this actually means" sits under each
+// one in the matrix header.
+const ORG_CRIT_BLURB = {
+  capability: 'Do we have enough of the right people, properly trained and available, to deliver what we’ve promised?',
+  impact: 'Can we prove, with real evidence, the difference PET-Xi actually makes for learners and employers?',
+  service: 'How well do we look after the people and organisations who commission and pay us?',
+  systems: 'Do our internal processes and systems actually work day to day, without relying on memory?',
+};
+
 // The score picker is position:fixed, so it never moves with page scroll —
 // if it opens below the viewport the 2/3/4 buttons render off-screen.
 // Flip it to open upward when there isn't room below.
@@ -239,9 +249,11 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, liveCountByCell, onOpenA
             <col style={{ width: 90 }} />
           </colgroup>
           <thead>
-            <tr><th className="crit-col" rowSpan={2} />{ocrit.map(c =>
+            <tr><th className="crit-col" rowSpan={3} />{ocrit.map(c =>
               <th key={c.id} colSpan={3} className="usep" title={critTip(c)}><span className="unit-name">{c.name}</span></th>)}
-              <th rowSpan={2}><span className="sub-head">MEAN</span></th></tr>
+              <th rowSpan={3}><span className="sub-head">MEAN</span></th></tr>
+            <tr>{ocrit.map(c =>
+              <th key={c.id + 'blurb'} colSpan={3} className="usep cat-blurb">{ORG_CRIT_BLURB[c.id]}</th>)}</tr>
             <tr>{ocrit.map(c => [
               <th key={c.id + 'ch'}><span className="sub-head">CH</span></th>,
               <th key={c.id + 'mid'} className="live-head"><span className="sub-head">Live<br />Projects</span></th>,

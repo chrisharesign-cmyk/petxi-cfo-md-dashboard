@@ -36,6 +36,7 @@ table.matrix{border-collapse:separate;border-spacing:0;width:100%;min-width:1060
 .usep{border-right:1px solid var(--line)}
 .unit-name{font-weight:800;font-size:.8rem;line-height:1.2;display:block;cursor:pointer;background:none;border:none;color:inherit;font-family:inherit;padding:0;text-align:center;width:100%}
 .unit-name:hover{text-decoration:underline}
+.cat-blurb{font-weight:400;font-size:.68rem;line-height:1.35;color:var(--ink-soft);text-transform:none;letter-spacing:normal;padding:.3rem .55rem;vertical-align:top;white-space:normal}
 .unit-mean{display:inline-block;font-family:var(--mono);font-weight:600;font-size:.95rem;color:#fff;border-radius:6px;padding:.12rem .5rem;margin-top:.3rem}
 .sub-head{font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.08em;color:var(--ink-soft)}
 .unit-div{font-family:var(--mono);font-size:.62rem;color:var(--ink-soft);display:block;margin-top:.2rem}

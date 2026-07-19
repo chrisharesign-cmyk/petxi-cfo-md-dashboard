@@ -96,7 +96,7 @@ export default function CaseFile({ projectId, me, data, onBack, onRefresh }) {
       const chain = chainFrom(root);
       return { at: root.created_at, kind: 'note', note: chain[chain.length - 1], prior: chain.slice(0, -1) };
     }),
-  ].sort((a, b) => new Date(a.at) - new Date(b.at));
+  ].sort((a, b) => new Date(b.at) - new Date(a.at));
 
   const act = async (fn, ...args) => {
     setBusy(true); setActionError('');
