@@ -42,6 +42,9 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
   const excellenceText = scope === 'unit'
     ? (crit?.descriptors_by_unit?.[unit_id] || crit?.descriptors)?.[0]
     : crit?.descriptors?.[0];
+  const improveText = scope === 'unit'
+    ? (crit?.solution_by_unit?.[unit_id] || crit?.solution)
+    : (crit?.solution_by_function?.[function_id] || crit?.solution);
 
   const saveRC = async () => {
     setRcBusy(true);
@@ -78,6 +81,17 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
       {excellenceText && (
         <div className="card legend-card" style={{ marginTop: '1rem' }}>
           <b>What excellence looks like:</b> {excellenceText}
+        </div>
+      )}
+
+      {improveText && (
+        <div className="card" style={{ marginTop: '1rem' }}>
+          <h4 style={{ margin: 0 }}>Claude's Initial Thoughts on how to Improve</h4>
+          <p className="muted" style={{ fontSize: '.78rem', marginTop: '.2rem' }}>
+            A starting point, tailored to this {scope === 'unit' ? 'unit' : 'horizontal'} — worth challenging, not
+            just following. This applies whatever the current grade; there's always a next step.
+          </p>
+          <p style={{ marginTop: '.5rem', whiteSpace: 'pre-wrap' }}>{improveText}</p>
         </div>
       )}
 
