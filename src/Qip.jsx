@@ -16,8 +16,8 @@ function critTip(c) {
 // one in the matrix header.
 const ORG_CRIT_BLURB = {
   capability: 'Do we have enough of the right people, properly trained and available, to deliver what we’ve promised?',
-  impact: 'Can we prove, with real evidence, the difference PET-Xi actually makes for learners and employers?',
-  service: 'How well do we look after the people and organisations who commission and pay us?',
+  impact: 'Can we prove, with real evidence, the difference this team makes for our own staff, learners and employers?',
+  service: 'How well does this team look after our own internal teams and the people and organisations who commission and pay us?',
   systems: 'Do our internal processes and systems actually work day to day, without relying on memory?',
 };
 
