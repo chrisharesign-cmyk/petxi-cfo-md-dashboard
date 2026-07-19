@@ -86,7 +86,7 @@ export default function ProjectLinks({ project, me, data }) {
           {confirmed.map(l => (
             <span key={l.id} className="fchip active" style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem' }} title={l.note || undefined}>
               {areaName(l)} &gt; {critName(l)}
-              <button className="linklike" style={{ color: '#fff' }} onClick={() => remove(l.id)} title="Remove">×</button>
+              <button className="linklike" style={{ color: 'var(--xi)', fontWeight: 800, textDecoration: 'none' }} onClick={() => remove(l.id)} title="Remove">×</button>
             </span>
           ))}
         </div>
