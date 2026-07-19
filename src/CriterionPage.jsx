@@ -83,28 +83,32 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
 
       {excellenceText && (
         <div className="card legend-card" style={{ marginTop: '1rem' }}>
-          <b>What excellence looks like:</b> {excellenceText}
+          <b>What excellent looks like</b> {excellenceText}
         </div>
       )}
 
       {(improveText || likelyCauseText) && (
-        <div className="card" style={{ marginTop: '1rem' }}>
-          <h4 style={{ margin: 0 }}>Claude's Initial Thoughts on how to Improve</h4>
-          <p className="muted" style={{ fontSize: '.78rem', marginTop: '.2rem' }}>
-            A starting point, tailored to this {scope === 'unit' ? 'unit' : 'horizontal'} — worth challenging, not
-            just following. This applies whatever the current grade; there's always a next step.
+        <div className="card thoughts-card" style={{ marginTop: '1rem' }}>
+          <h4>Claude's initial thoughts on how to improve</h4>
+          <p className="thoughts-sub">
+            A starting point for this {scope === 'unit' ? 'unit' : 'horizontal'} — worth challenging, not just
+            following. Applies whatever the current grade; there's always a next step.
           </p>
           {likelyCauseText && (
-            <>
-              <h5 style={{ margin: '.8rem 0 .2rem', fontSize: '.82rem' }}>Likely root cause</h5>
-              <p style={{ margin: 0 }}>{likelyCauseText}</p>
-            </>
+            <div className="thoughts-sec">
+              <div className="thoughts-label"><span className="dot" />Why this is probably happening</div>
+              <p>{likelyCauseText}</p>
+            </div>
           )}
           {improveText && (
-            <>
-              <h5 style={{ margin: '.8rem 0 .2rem', fontSize: '.82rem' }}>Ways to improve</h5>
-              <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{improveText}</p>
-            </>
+            <div className="thoughts-sec">
+              <div className="thoughts-label"><span className="dot" />What could help</div>
+              <ul className="thoughts-list">
+                {improveText.split('\n').map(line => line.replace(/^[\s-]+/, '').trim()).filter(Boolean).map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}
