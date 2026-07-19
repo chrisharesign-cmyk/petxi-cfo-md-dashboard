@@ -130,7 +130,7 @@ function Dashboard({ me, onLeave }) {
           <div className="brand">PET-<em>Xi</em></div>
           <h1>Quality Improvement Plan</h1>
           <div className="whoami">
-            <select className="periodsel" value={periodId || ''} onChange={e => { setPeriodId(e.target.value); setAreaView(null); setCriterionView(null); }}>
+            <select className="periodsel" value={periodId || ''} onChange={e => { setPeriodId(e.target.value); setAreaView(null); setCriterionView(null); setCaseFileId(null); }}>
               {data.periods.map(p => <option key={p.id} value={p.id}>{p.label}{p.locked_at ? ' (locked)' : ''}</option>)}
             </select>
             <span>Reviewing as <b>{me}</b></span>
@@ -154,7 +154,7 @@ function Dashboard({ me, onLeave }) {
       </header>
       <nav className="tabs">
         {[['qip', 'SAR'], ['projects', 'Excellence Projects'], ['meetings', 'Meetings'], ['activity', 'This Week']].map(([k, l]) => (
-          <button key={k} className={tab === k ? 'active' : ''} onClick={() => { setTab(k); setAreaView(null); setCriterionView(null); }}>{l}</button>
+          <button key={k} className={tab === k ? 'active' : ''} onClick={() => { setTab(k); setAreaView(null); setCriterionView(null); setCaseFileId(null); }}>{l}</button>
         ))}
       </nav>
       <div className="wrap">
