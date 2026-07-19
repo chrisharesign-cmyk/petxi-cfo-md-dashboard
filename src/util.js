@@ -217,37 +217,85 @@ export function ragMovementsFromRows(rows) {
   return { wins, slips };
 }
 
-// Turns a raw audit_log row into a human sentence for the Activity tab.
-// Deliberately filters hard — routine scoring and minor field edits (owner,
-// target date, blocker text) would drown out the handful of things that
-// actually matter in a week: new projects, re-grades, status moves, notes,
-// locks, meetings.
-export function describeActivityRow(row, data) {
-  const projectTitle = (id) => data.projects.find(p => p.id === Number(id))?.title || `project #${id}`;
+// Turns a raw audit_log row into structured fields for the Activity table —
+// date, status, project, primary criteria, RAG — rather than a single
+// sentence, so the tab can render an actual table. Deliberately filters
+// hard — routine scoring and minor field edits (owner, target date, blocker
+// text) would drown out the handful of things that actually matter in a
+// week: new projects, RAG moves, status moves, notes, locks, meetings.
+export function activityRowInfo(row, data) {
+  const project = (id) => data.projects.find(p => p.id === Number(id));
+  const criterionName = (p) => {
+    if (!p) return null;
+    const c = p.scope === 'unit' ? data.criteria.find(x => x.id === p.criterion_id) : data.ocrit.find(x => x.id === p.criterion_id);
+    return c?.name || p.criterion_id || null;
+  };
 
   if (row.table_name === 'project_notes') {
     if (row.action !== 'INSERT' || !row.new_row?.body) return null;
-    return { icon: '📝', text: `${row.new_row.author} updated "${projectTitle(row.new_row.project_id)}": ${row.new_row.body}` };
+    const p = project(row.new_row.project_id);
+    return {
+      icon: '📝', status: `Note by ${row.new_row.author}`,
+      projectId: p?.id ?? Number(row.new_row.project_id), title: p?.title || `project #${row.new_row.project_id}`,
+      criteria: criterionName(p), rag: p?.progress_rag,
+    };
   }
   if (row.table_name === 'projects') {
-    if (row.action === 'INSERT') return { icon: '➕', text: `New project: "${row.new_row?.title}"` };
+    if (row.action === 'INSERT') {
+      return {
+        icon: '➕', status: 'New project',
+        projectId: row.new_row?.id, title: row.new_row?.title,
+        criteria: criterionName(project(row.new_row?.id) || row.new_row), rag: row.new_row?.progress_rag,
+      };
+    }
     if (row.action !== 'UPDATE') return null;
     const before = row.old_row || {}, after = row.new_row || {};
+    const p = project(after.id);
     if (before.progress_rag !== after.progress_rag && after.progress_rag != null) {
       const improved = before.progress_rag && RAG_RANK[after.progress_rag] < RAG_RANK[before.progress_rag];
       const icon = !before.progress_rag ? '🚦' : improved ? '🎉' : '⚠';
-      return { icon, text: `"${after.title}" marked ${RAG_LABEL[after.progress_rag].toLowerCase()}${before.progress_rag ? ` (was ${RAG_LABEL[before.progress_rag].toLowerCase()})` : ''}` };
+      const status = before.progress_rag
+        ? `RAG: ${RAG_LABEL[before.progress_rag]} → ${RAG_LABEL[after.progress_rag]}`
+        : `RAG set: ${RAG_LABEL[after.progress_rag]}`;
+      return { icon, status, projectId: after.id, title: after.title, criteria: criterionName(p || after), rag: after.progress_rag };
     }
     if (before.status !== after.status) {
-      return { icon: '↪', text: `"${after.title}" moved to ${STATUS_LABEL[after.status] || after.status}${after.pace ? ` (${PACE_LABEL[after.pace]})` : ''}` };
+      return {
+        icon: '↪', status: `Moved to ${STATUS_LABEL[after.status] || after.status}${after.pace ? ` (${PACE_LABEL[after.pace]})` : ''}`,
+        projectId: after.id, title: after.title, criteria: criterionName(p || after), rag: after.progress_rag ?? p?.progress_rag,
+      };
     }
     return null;
   }
   if (row.table_name === 'sar_periods' && row.new_row?.locked_at && row.old_row?.locked_at == null) {
-    return { icon: '🔒', text: `${row.actor_name} locked the SAR (${row.new_row?.label || row.new_row?.id})` };
+    return { icon: '🔒', status: `SAR locked by ${row.actor_name} (${row.new_row?.label || row.new_row?.id})`, projectId: null, title: null, criteria: null, rag: null };
   }
   if (row.table_name === 'meetings' && row.action === 'UPDATE' && row.new_row?.ended_at && !row.old_row?.ended_at) {
-    return { icon: '🎙', text: `Meeting recorded (${(row.new_row?.transcript || []).length} lines captured)` };
+    return { icon: '🎙', status: `Meeting recorded (${(row.new_row?.transcript || []).length} lines captured)`, projectId: null, title: null, criteria: null, rag: null };
   }
   return null;
+}
+
+// Rolls this window's activity up against the full live-project count, for
+// the "N/M moved" headline. Buckets are mutually exclusive and always sum
+// to the live total: stalled (RAG got worse) takes priority over moved
+// (touched some other way — a note, a status move, a RAG improvement), and
+// anything untouched is not moved.
+export function liveActivitySummary(data, rows) {
+  const live = data.projects.filter(p => !p.archived_at && p.status === 'live');
+  const liveIds = new Set(live.map(p => p.id));
+  const touchedIds = new Set();
+  rows.forEach(row => {
+    if (row.table_name === 'project_notes' && row.new_row?.project_id) touchedIds.add(Number(row.new_row.project_id));
+    if (row.table_name === 'projects' && row.record_pk) touchedIds.add(Number(row.record_pk));
+  });
+  const { slips } = ragMovementsFromRows(rows);
+  const stalledIds = new Set(slips.filter(s => liveIds.has(s.id)).map(s => s.id));
+  const movedIds = new Set([...touchedIds].filter(id => liveIds.has(id) && !stalledIds.has(id)));
+  return {
+    total: live.length,
+    moved: movedIds.size,
+    stalled: stalledIds.size,
+    notMoved: live.filter(p => !touchedIds.has(p.id)).length,
+  };
 }

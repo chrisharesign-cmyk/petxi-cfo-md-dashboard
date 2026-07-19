@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadRecentActivity, overallTrend, lastQipMeeting } from './data';
-import { describeActivityRow, ragMovementsFromRows, daysInStage, RAG_LABEL } from './util';
+import { activityRowInfo, liveActivitySummary, ragMovementsFromRows, daysInStage, RAG_LABEL } from './util';
 import { meanGrade } from './matrixdata';
 import Sparkline from './Sparkline';
 
@@ -88,9 +88,10 @@ export default function ActivityTab({ data, onOpenCase }) {
   const { wins, slips } = ragMovementsFromRows(rows || []);
 
   const feed = (rows || [])
-    .map(r => ({ row: r, d: describeActivityRow(r, data) }))
+    .map(r => ({ row: r, d: activityRowInfo(r, data) }))
     .filter(x => x.d);
   const stale = rows ? staleOwnedProjects(data, feed) : [];
+  const summary = rows ? liveActivitySummary(data, rows) : null;
 
   const windowLabel = WINDOWS.find(([d]) => d === days)?.[1] || `${days} days`;
 
@@ -110,9 +111,11 @@ export default function ActivityTab({ data, onOpenCase }) {
       <TrendCard />
       <QipMeetingCard />
 
-      {rows && (
+      {rows && summary && (
         <div className="card exec-summary" style={{ marginTop: '1rem' }}>
-          <b>{wins.length}</b> improved, <b>{slips.length}</b> slipped, <b>{feed.length}</b> update{feed.length === 1 ? '' : 's'} logged
+          <b>{summary.moved}/{summary.total}</b> live project{summary.total === 1 ? '' : 's'} moved,{' '}
+          <b style={{ color: summary.stalled > 0 ? 'var(--g4)' : undefined }}>{summary.stalled}/{summary.total}</b> stalled,{' '}
+          <b style={{ color: summary.notMoved > 0 ? 'var(--g4)' : undefined }}>{summary.notMoved}/{summary.total}</b> not moved, over the last {windowLabel}
           {stale.length > 0 && <> — <b style={{ color: 'var(--g4)' }}>{stale.length} owned project{stale.length === 1 ? '' : 's'} with no visible progress</b></>}.
         </div>
       )}
@@ -161,14 +164,32 @@ export default function ActivityTab({ data, onOpenCase }) {
         {err && <p className="muted" style={{ color: 'var(--g4)' }}>{err}</p>}
         {!err && !rows && <p className="muted">Loading…</p>}
         {rows && !feed.length && <p className="muted">Nothing logged in this window yet.</p>}
-        {feed.map(({ row, d }) => (
-          <div key={row.id} className="activity-row">
-            <span className="muted" style={{ fontSize: '.7rem', fontFamily: 'var(--mono)' }}>
-              {new Date(row.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-            </span>
-            <span>{d.icon} {d.text}</span>
-          </div>
-        ))}
+        {feed.length > 0 && (
+          <table className="ptable" style={{ marginTop: '.5rem' }}>
+            <thead>
+              <tr>
+                <th>Date</th><th>Status</th><th>Project</th><th>Primary criteria</th><th>RAG</th>
+              </tr>
+            </thead>
+            <tbody>
+              {feed.map(({ row, d }) => (
+                <tr key={row.id}>
+                  <td className="muted" style={{ fontFamily: 'var(--mono)', fontSize: '.72rem', whiteSpace: 'nowrap' }}>
+                    {new Date(row.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                  <td>{d.icon} {d.status}</td>
+                  <td>
+                    {d.projectId
+                      ? <button className="linklike" onClick={() => onOpenCase(d.projectId)}>{d.title}</button>
+                      : <span className="muted">{d.title || '—'}</span>}
+                  </td>
+                  <td>{d.criteria || <span className="muted">—</span>}</td>
+                  <td>{d.rag ? <><span className={`rag rag-${d.rag}`} /> {RAG_LABEL[d.rag]}</> : <span className="muted">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </>
   );
