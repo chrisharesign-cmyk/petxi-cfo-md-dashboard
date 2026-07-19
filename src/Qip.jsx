@@ -36,9 +36,9 @@ function CircleNav({ count, onOpen, label }) {
 function DotLegend() {
   return (
     <div className="card legend-card">
-      <b>The circle</b> between Chris's and Fleur's scores is always there — it's the number of live projects
-      running against that criterion (or "–" for none). <b>Double-click it</b> to open that criterion's own page:
-      root cause analysis, and every project (solution) against it.
+      <b>The square</b> under "Live Projects", between Chris's and Fleur's scores, is always there — it's the
+      number of live projects running against that criterion (or "–" for none). <b>Double-click it</b> to open
+      that criterion's own page: root cause analysis, and every project (solution) against it.
     </div>
   );
 }
@@ -100,7 +100,7 @@ export default function Qip({ data, me, myKey, onScore, canEdit, liveCountByCell
         <table className="matrix">
           <colgroup>
             <col style={{ width: 220 }} />
-            {units.flatMap(u => [<col key={u.id + '-ch'} />, <col key={u.id + '-mid'} style={{ width: 44 }} />, <col key={u.id + '-fs'} />])}
+            {units.flatMap(u => [<col key={u.id + '-ch'} />, <col key={u.id + '-mid'} style={{ width: 60 }} />, <col key={u.id + '-fs'} />])}
           </colgroup>
           <thead>
             <tr>
@@ -120,7 +120,7 @@ export default function Qip({ data, me, myKey, onScore, canEdit, liveCountByCell
             <tr>
               {units.map(u => [
                 <th key={u.id + 'ch'}><span className="sub-head">CH</span></th>,
-                <th key={u.id + 'mid'} />,
+                <th key={u.id + 'mid'} className="live-head"><span className="sub-head">Live<br />Projects</span></th>,
                 <th key={u.id + 'fs'} className="usep"><span className="sub-head">FS</span></th>,
               ])}
             </tr>
@@ -235,7 +235,7 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, liveCountByCell, onOpenA
         <table className="matrix">
           <colgroup>
             <col style={{ width: 220 }} />
-            {ocrit.flatMap(c => [<col key={c.id + '-ch'} />, <col key={c.id + '-mid'} style={{ width: 44 }} />, <col key={c.id + '-fs'} />])}
+            {ocrit.flatMap(c => [<col key={c.id + '-ch'} />, <col key={c.id + '-mid'} style={{ width: 60 }} />, <col key={c.id + '-fs'} />])}
             <col style={{ width: 90 }} />
           </colgroup>
           <thead>
@@ -244,7 +244,7 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, liveCountByCell, onOpenA
               <th rowSpan={2}><span className="sub-head">MEAN</span></th></tr>
             <tr>{ocrit.map(c => [
               <th key={c.id + 'ch'}><span className="sub-head">CH</span></th>,
-              <th key={c.id + 'mid'} />,
+              <th key={c.id + 'mid'} className="live-head"><span className="sub-head">Live<br />Projects</span></th>,
               <th key={c.id + 'fs'} className="usep"><span className="sub-head">FS</span></th>,
             ])}</tr>
           </thead>
