@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { REVIEWERS } from './supa';
-import { addProject } from './data';
+import { addProject, markProjectDiscussed } from './data';
 import { STATUS_LABEL, PACE_LABEL, statusBadge, statusSortKey, fmtDate, overdueBy, daysInStage, isOverStageLimit, gradeMovement, autoTarget } from './util';
 import { OwnerEditor, ImpactEditor, TargetEditor, StatusMenu } from './ProjectControls';
 import EditableText from './EditableText';
 
 const RAG = { G: '#97D700', A: '#E8A317', R: '#D0342C' };
-// Not-yet-live / no-longer-open statuses — filterable directly by status.
-const STATUSES = ['potential', 'queued', 'paused', 'completed', 'cancelled'];
+// 'potential'/'queued' aren't offered here on purpose — nothing can be
+// created in those statuses any more (everything goes straight to live),
+// and every existing row in them is already archived, so they'd always be
+// empty filters. Only statuses a live project can actually still reach.
+const STATUSES = ['paused', 'completed', 'cancelled'];
 // "Live" itself never appears as visible text anywhere (every live project
 // shows its pace instead — Rapid Fix / Short & mid-term / Long term) — so
 // filter on pace here too, rather than on a "Live" label nothing displays.
@@ -80,6 +83,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
       if (pace && pace.test(p)) return true;
       if (f === 'Overdue' && p.due && overdueBy(p.due) && !['completed', 'cancelled'].includes(p.status)) return true;
       if (f === 'New this period' && periodStart && new Date(p.created_at) >= periodStart) return true;
+      if (f === 'To be discussed' && !p.discussed_at) return true;
       if (f === 'Mine' && p.owner === me) return true;
       const m = gradeMovement(p);
       if (f === 'Improved' && m?.improved) return true;
@@ -114,7 +118,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
             {pc.label}
           </button>
         ))}
-        {['Overdue', 'New this period', 'Mine', 'Improved', 'Slipped', 'Archived'].map(f => (
+        {['Overdue', 'New this period', 'To be discussed', 'Mine', 'Improved', 'Slipped', 'Archived'].map(f => (
           <button key={f} className={`fchip ${filters.has(f) ? 'active' : ''}`} onClick={() => toggle(f)}>
             {f}
           </button>
@@ -150,6 +154,11 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
                   <td><OwnerEditor project={p} data={data} onSaved={onRefresh} /></td>
                   <td>
                     <span className={`st ${badge.cls}`}>{badge.label}</span>
+                    {!p.discussed_at && (
+                      <button className="linklike" style={{ marginLeft: '.4rem', fontSize: '.68rem' }}
+                        title="Not yet raised at a meeting — click to mark discussed"
+                        onClick={() => markProjectDiscussed(p.id).then(onRefresh)}>to discuss</button>
+                    )}
                     <StatusMenu project={p} data={data} onSaved={onRefresh} />
                   </td>
                   <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>

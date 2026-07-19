@@ -87,7 +87,7 @@ async function loadForPeriod(periodId) {
 
 // Worst grade per cell-key, across both reviewers — a project's identity
 // ignores the reviewer dimension, so CH and FS both grading 3 is one cell.
-function worstGrades(scores, oscores) {
+export function worstGrades(scores, oscores) {
   const worst = {};
   scores.forEach(s => {
     const key = unitCellKey(s.unit_id, s.criterion_id);
@@ -210,6 +210,13 @@ export async function unarchiveProject(id) {
     .update({ archived_at: null, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) throw error;
 }
+// "Has this project actually been raised at a meeting yet" — separate from
+// status/owner/pace, which are already real the moment a project is
+// created. Manual, not inferred from meeting content, so it can't misfire.
+export async function markProjectDiscussed(id) {
+  const { error } = await supa.from('projects').update({ discussed_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
 
 // Everything that happened in the last `days` days, across every audited
 // table, for the Activity tab.
@@ -237,20 +244,22 @@ export async function editNote(oldNote, newBody) {
 }
 
 // ---- meetings ----
-// kind: 'qip' (Fleur - QIP meeting, general), 'project' (carries project_id),
-// or 'criterion' (carries scope/unit_id or function_id/criterion_id — for
-// discussing root cause before any project exists yet) — chosen before
-// recording starts, enforced by a DB check constraint.
-export async function startMeeting(started_by, period_id, { kind = 'qip', project_id = null, title = null, criterion = null } = {}) {
+// Two kinds going forward: 'qip' (the standing review — its agenda is
+// computed live by qipAgenda() off current grades/projects) and 'project'
+// (carries project_id, agenda computed by projectAgenda()). 'criterion' is
+// still a legal value in the DB (one historic row has it) but is no longer
+// offered as a way to start a new meeting — a criterion meeting's whole
+// purpose, discussing root cause before a project exists, is now just the
+// "solutions needed" section of every QIP agenda.
+export async function startMeeting(started_by, period_id, { kind = 'qip', project_id = null, title = null, agendaRows = [] } = {}) {
   const { data, error } = await supa.from('meetings')
-    .insert({
-      started_by, period_id, kind, project_id, title,
-      scope: criterion?.scope ?? null,
-      unit_id: criterion?.scope === 'unit' ? criterion.unit_id : null,
-      function_id: criterion?.scope === 'org' ? criterion.function_id : null,
-      criterion_id: criterion?.criterion_id ?? null,
-    }).select().single();
+    .insert({ started_by, period_id, kind, project_id, title }).select().single();
   if (error) throw error;
+  if (kind === 'qip' && agendaRows.length) {
+    const { error: mcErr } = await supa.from('meeting_criteria')
+      .insert(agendaRows.map(r => ({ meeting_id: data.id, ...r })));
+    if (mcErr) throw mcErr;
+  }
   return data;
 }
 export async function endMeeting(id, { transcript, attendees, promoted_project_ids }) {
@@ -288,12 +297,46 @@ export async function loadMeetingsForProject(projectId) {
   if (error) throw error;
   return data;
 }
+// Every meeting that ever touched this criterion — old single-criterion
+// meetings (the retired 'criterion' kind) via the direct columns, plus
+// every QIP meeting whose snapshotted agenda covered it via meeting_criteria.
 export async function loadMeetingsForCriterion(scope, unit_id, function_id, criterion_id) {
-  let q = supa.from('meetings').select('*').eq('scope', scope).eq('criterion_id', criterion_id).not('ended_at', 'is', null);
-  q = scope === 'unit' ? q.eq('unit_id', unit_id) : q.eq('function_id', function_id);
-  const { data, error } = await q.order('started_at', { ascending: false });
+  let directQ = supa.from('meetings').select('*').eq('scope', scope).eq('criterion_id', criterion_id).not('ended_at', 'is', null);
+  directQ = scope === 'unit' ? directQ.eq('unit_id', unit_id) : directQ.eq('function_id', function_id);
+  let linkQ = supa.from('meeting_criteria').select('grade_at_meeting, meetings(*)').eq('scope', scope).eq('criterion_id', criterion_id);
+  linkQ = scope === 'unit' ? linkQ.eq('unit_id', unit_id) : linkQ.eq('function_id', function_id);
+  const [direct, linked] = await Promise.all([directQ, linkQ]);
+  if (direct.error) throw direct.error;
+  if (linked.error) throw linked.error;
+  const fromLinks = linked.data.map(r => ({ ...r.meetings, grade_at_meeting: r.grade_at_meeting })).filter(m => m?.ended_at);
+  const byId = new Map([...direct.data, ...fromLinks].map(m => [m.id, m]));
+  return [...byId.values()].sort((a, b) => new Date(b.started_at) - new Date(a.started_at));
+}
+
+// ---- meeting documents: attach a formatted doc alongside pasted minutes ----
+export async function loadMeetingDocuments(meetingId) {
+  const { data, error } = await supa.from('meeting_documents').select('*')
+    .eq('meeting_id', meetingId).order('created_at', { ascending: false });
   if (error) throw error;
   return data;
+}
+export async function uploadMeetingDocument(meetingId, file, uploadedBy) {
+  const path = `meetings/${meetingId}/${Date.now()}-${file.name}`;
+  const { error: upErr } = await supa.storage.from('project-docs').upload(path, file, { contentType: file.type || 'application/octet-stream' });
+  if (upErr) throw upErr;
+  const { error } = await supa.from('meeting_documents').insert({
+    meeting_id: meetingId, filename: file.name, storage_path: path,
+    uploaded_by: uploadedBy, mime_type: file.type || 'application/octet-stream', size_bytes: file.size,
+  });
+  if (error) throw error;
+}
+export function meetingDocumentUrl(storage_path) {
+  return supa.storage.from('project-docs').getPublicUrl(storage_path).data.publicUrl;
+}
+export async function deleteMeetingDocument(doc) {
+  await supa.storage.from('project-docs').remove([doc.storage_path]);
+  const { error } = await supa.from('meeting_documents').delete().eq('id', doc.id);
+  if (error) throw error;
 }
 
 // ---- project links: "also affects" tags beyond a project's primary home ----

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supa, REVIEWERS } from './supa';
 import { loadNotes, addNote, editNote, promoteLive, pauseProject, resumeLive,
   moveBackLive, completeProject, cancelProject, updateCurrentGrade, loadMeetingsForProject,
-  archiveProject, unarchiveProject } from './data';
+  archiveProject, unarchiveProject, markProjectDiscussed } from './data';
 import { PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
   friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, gradeMovement } from './util';
 import EditableText from './EditableText';
@@ -197,6 +197,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
           {project.status === 'completed' && <button className="btn" disabled={busy} onClick={() => act(moveBackLive, project.id)}>Moved back — regressed to live</button>}
           {['potential', 'queued', 'live', 'paused'].includes(project.status) &&
             <button className="btn danger" disabled={busy} onClick={cancel}>Cancel</button>}
+          {!project.discussed_at && <button className="btn" disabled={busy} onClick={() => act(markProjectDiscussed, project.id)}>Mark discussed</button>}
           {!project.archived_at && <button className="btn danger" disabled={busy} onClick={archive}>Archive</button>}
         </div>
         {actionError && <p className="muted" style={{ color: 'var(--g4)' }}>{actionError}</p>}

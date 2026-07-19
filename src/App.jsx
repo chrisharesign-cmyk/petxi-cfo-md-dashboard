@@ -172,7 +172,7 @@ function Dashboard({ me, onLeave }) {
             {tab === 'qip' && <Qip data={data} me={me} myKey={myKey} onScore={score} canEdit={canEdit}
               liveCountByCell={liveCountByCell} onOpenArea={openArea} onOpenCriterion={openCriterion} onOpenCase={setCaseFileId} />}
             {tab === 'projects' && <ProjectsTab data={data} me={me} onRefresh={refresh} onOpenCase={setCaseFileId} />}
-            {tab === 'meetings' && <MeetingsTab data={data} me={me} onOpenCase={setCaseFileId} />}
+            {tab === 'meetings' && <MeetingsTab data={data} me={me} onOpenCase={setCaseFileId} onOpenCriterion={openCriterion} onRefresh={refresh} />}
             {tab === 'activity' && <ActivityTab data={data} onOpenCase={setCaseFileId} />}
           </>}
       </div>

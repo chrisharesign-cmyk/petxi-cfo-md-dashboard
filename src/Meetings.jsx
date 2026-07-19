@@ -1,22 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
-import { startMeeting, endMeeting, loadMeetings, updateMeeting, deleteMeeting } from './data';
-import { fmtDate, overdueBy } from './util';
+import { startMeeting, endMeeting, loadMeetings, updateMeeting, deleteMeeting,
+  markProjectDiscussed, loadMeetingDocuments, uploadMeetingDocument, deleteMeetingDocument, meetingDocumentUrl } from './data';
+import { qipAgenda, agendaCriteriaRows, projectAgenda } from './agenda';
+import { fmtDate, PACE_LABEL, statusBadge } from './util';
 import { useConfirm } from './Dialogs';
 
-const KIND_LABEL = { qip: 'Fleur - QIP meeting', project: 'Project meeting', criterion: 'Criterion meeting' };
+// 'criterion' stays here only so an old row (started before this kind was
+// retired) still renders sensibly in the past-meetings list — it's no
+// longer offered as a way to start a new one.
+const KIND_LABEL = { qip: 'QIP meeting', project: 'Project meeting', criterion: 'Criterion meeting' };
 const KIND_CLASS = { qip: 'st-fix', project: 'st-embed', criterion: 'st-hold' };
 
-export default function MeetingsTab({ data, me, onOpenCase }) {
+export default function MeetingsTab({ data, me, onOpenCase, onOpenCriterion, onRefresh }) {
+  const [kind, setKind] = useState('qip');
+  const [projectId, setProjectId] = useState('');
   const [agenda, setAgenda] = useState(null);
   const [meeting, setMeeting] = useState(null);
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState([]);
   const [supported, setSupported] = useState(true);
-  const [kind, setKind] = useState('qip');
-  const [projectId, setProjectId] = useState('');
-  const [critScope, setCritScope] = useState('unit');
-  const [critAreaId, setCritAreaId] = useState('');
-  const [critId, setCritId] = useState('');
   const [past, setPast] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const recRef = useRef(null);
@@ -29,32 +31,31 @@ export default function MeetingsTab({ data, me, onOpenCase }) {
   const refreshPast = () => loadMeetings().then(setPast).catch(() => {});
   useEffect(() => { refreshPast(); }, []);
 
-  // autosave transcript so a refresh/close doesn't lose the in-progress record
   useEffect(() => {
     if (transcript.length) localStorage.setItem('petxi-meeting-draft', JSON.stringify(transcript));
   }, [transcript]);
 
-  const critOptions = critScope === 'unit'
-    ? data.criteria.filter(c => !c.unit_id || c.unit_id === critAreaId)
-    : data.ocrit;
+  const selectedProject = projectId ? data.projects.find(p => String(p.id) === String(projectId)) : null;
+  const readyToRecord = kind === 'qip' || (kind === 'project' && selectedProject);
 
-  const prepareMeeting = () => {
-    const overdueP = data.projects.filter(p => !p.archived_at && p.due && overdueBy(p.due) && ['live', 'paused'].includes(p.status));
-    setAgenda({ overdueP });
+  const prepareAgenda = () => setAgenda(kind === 'qip' ? qipAgenda(data) : projectAgenda(selectedProject, data));
+
+  const markNewDiscussed = async (id) => {
+    await markProjectDiscussed(id);
+    onRefresh?.();
+    setAgenda(a => (a && a.newProjects) ? { ...a, newProjects: a.newProjects.filter(p => p.id !== id) } : a);
   };
-
-  const readyToRecord = kind === 'qip' || (kind === 'project' && projectId) || (kind === 'criterion' && critAreaId && critId);
 
   const startRec = async () => {
     if (!readyToRecord) return;
+    const currentAgenda = agenda || (kind === 'qip' ? qipAgenda(data) : projectAgenda(selectedProject, data));
     const m = await startMeeting(me, data.period?.id, {
       kind,
       project_id: kind === 'project' ? Number(projectId) : null,
-      criterion: kind === 'criterion'
-        ? { scope: critScope, unit_id: critScope === 'unit' ? critAreaId : null, function_id: critScope === 'org' ? critAreaId : null, criterion_id: critId }
-        : null,
+      agendaRows: kind === 'qip' ? agendaCriteriaRows(currentAgenda) : [],
     });
     setMeeting(m);
+    setAgenda(currentAgenda);
     setTranscript([]);
     setRecording(true);
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -88,8 +89,8 @@ export default function MeetingsTab({ data, me, onOpenCase }) {
   };
 
   const copyForClaude = (lines) => {
-    const prompt = `Write up minutes from this PET-Xi QIP review meeting transcript. Summarise decisions, ` +
-      `list any projects promoted to live or queued, and note follow-ups.\n\nTranscript:\n` +
+    const prompt = `Write up minutes from this PET-Xi meeting transcript. Summarise decisions, ` +
+      `list any projects agreed or actions assigned, and note follow-ups.\n\nTranscript:\n` +
       lines.map(t => `[${t.at}] ${t.text}`).join('\n');
     navigator.clipboard?.writeText(prompt);
   };
@@ -98,44 +99,26 @@ export default function MeetingsTab({ data, me, onOpenCase }) {
     <>
       <div className="panel-h"><span className="bar" style={{ background: 'var(--g3)' }} />Meetings</div>
       <p className="muted" style={{ marginBottom: '.8rem' }}>
-        Record a <b>Fleur - QIP meeting</b> for general review, an <b>individual project meeting</b> linked to one
-        project, or a <b>criterion meeting</b> — for discussing root cause before any project exists yet. When
-        Claude's written up the minutes from the transcript, paste them back in on that meeting's row below.
+        Record a <b>QIP meeting</b> — its agenda is generated live from current grades and projects, every time —
+        or a <b>Project meeting</b> for one specific project. When Claude's written up the minutes from the
+        transcript, paste them back in or attach the file on that meeting's row below.
       </p>
       <div className="card">
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '.8rem' }}>
           <select className="formctl" value={kind}
-            onChange={e => { setKind(e.target.value); setProjectId(''); setCritAreaId(''); setCritId(''); }} disabled={recording}>
-            <option value="qip">Fleur - QIP meeting</option>
-            <option value="project">Individual project meeting</option>
-            <option value="criterion">Criterion meeting</option>
+            onChange={e => { setKind(e.target.value); setProjectId(''); setAgenda(null); }} disabled={recording}>
+            <option value="qip">QIP meeting</option>
+            <option value="project">Project meeting</option>
           </select>
           {kind === 'project' && (
-            <select className="formctl" value={projectId} onChange={e => setProjectId(e.target.value)} disabled={recording}>
+            <select className="formctl" value={projectId} onChange={e => { setProjectId(e.target.value); setAgenda(null); }} disabled={recording}>
               <option value="">— pick project —</option>
               {data.projects.filter(p => !p.archived_at && p.status !== 'cancelled').map(p => (
                 <option key={p.id} value={p.id}>{p.title}</option>
               ))}
             </select>
           )}
-          {kind === 'criterion' && (
-            <>
-              <select className="formctl" value={critScope}
-                onChange={e => { setCritScope(e.target.value); setCritAreaId(''); setCritId(''); }} disabled={recording}>
-                <option value="unit">Business unit</option>
-                <option value="org">Org function</option>
-              </select>
-              <select className="formctl" value={critAreaId} onChange={e => { setCritAreaId(e.target.value); setCritId(''); }} disabled={recording}>
-                <option value="">— area —</option>
-                {(critScope === 'unit' ? data.units : data.ofuncs).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-              <select className="formctl" value={critId} onChange={e => setCritId(e.target.value)} disabled={recording || !critAreaId}>
-                <option value="">— criterion —</option>
-                {critOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </>
-          )}
-          <button onClick={prepareMeeting}>Prepare meeting</button>
+          <button onClick={prepareAgenda} disabled={kind === 'project' && !selectedProject}>Prepare agenda</button>
           {!recording
             ? <button onClick={startRec} disabled={!readyToRecord}>● Record</button>
             : <button className="danger" onClick={stopRec}>■ Stop &amp; save</button>}
@@ -145,15 +128,11 @@ export default function MeetingsTab({ data, me, onOpenCase }) {
           Live transcription needs Chrome or Edge — this browser doesn't support it. Recording can't start here.</p>}
         {recording && <p className="muted">Recording — {transcript.length} line{transcript.length === 1 ? '' : 's'} captured. Keep this tab open; switching tabs is fine.</p>}
 
-        {agenda && (
-          <div style={{ marginTop: '.8rem' }}>
-            <h4>Agenda</h4>
-            <p><b>Overdue:</b></p>
-            <ul>
-              {agenda.overdueP.map(p => <li key={p.id}>{p.title} — due {fmtDate(p.due)}</li>)}
-              {!agenda.overdueP.length && <li className="muted">None.</li>}
-            </ul>
-          </div>
+        {agenda && kind === 'qip' && (
+          <QipAgendaView agenda={agenda} onMarkDiscussed={markNewDiscussed} onOpenCase={onOpenCase} onOpenCriterion={onOpenCriterion} />
+        )}
+        {agenda && kind === 'project' && (
+          <ProjectAgendaView pa={agenda} onOpenCase={onOpenCase} onOpenCriterion={onOpenCriterion} />
         )}
 
         {transcript.length > 0 && (
@@ -167,7 +146,7 @@ export default function MeetingsTab({ data, me, onOpenCase }) {
       <div className="card">
         {!past.length && <p className="muted">None recorded yet.</p>}
         {past.map(m => (
-          <MeetingRow key={m.id} m={m} data={data}
+          <MeetingRow key={m.id} m={m} data={data} me={me}
             expanded={expandedId === m.id}
             onToggle={() => setExpandedId(expandedId === m.id ? null : m.id)}
             onOpenCase={onOpenCase} onCopy={copyForClaude} onChanged={refreshPast} />
@@ -177,23 +156,95 @@ export default function MeetingsTab({ data, me, onOpenCase }) {
   );
 }
 
-function MeetingRow({ m, data, expanded, onToggle, onOpenCase, onCopy, onChanged }) {
+function QipAgendaView({ agenda, onMarkDiscussed, onOpenCase, onOpenCriterion }) {
+  const open = w => onOpenCriterion({ scope: w.scope, unit_id: w.unit_id ?? null, function_id: w.function_id ?? null, criterion_id: w.criterion_id });
+  return (
+    <div style={{ marginTop: '.8rem' }}>
+      <h4 className="crit-card-h" style={{ marginBottom: '.6rem' }}>Agenda</h4>
+
+      <p style={{ fontWeight: 700 }}>New projects — not yet discussed ({agenda.newProjects.length})</p>
+      {!agenda.newProjects.length && <p className="muted">None.</p>}
+      {agenda.newProjects.map(p => (
+        <p key={p.id} style={{ marginTop: '.3rem' }}>
+          <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
+          <span className="muted"> — owner {p.owner || '—'}, added {fmtDate(p.created_at?.slice(0, 10))}</span>
+          {' '}<button className="linklike" onClick={() => onMarkDiscussed(p.id)}>mark discussed</button>
+        </p>
+      ))}
+
+      <GradeBlock label="Grade 4" bucket={agenda.grade4} onOpen={open} onOpenCase={onOpenCase} />
+      <GradeBlock label="Grade 3" bucket={agenda.grade3} onOpen={open} onOpenCase={onOpenCase} />
+
+      <p style={{ fontWeight: 700, marginTop: '.8rem' }}>Other updates</p>
+      <p className="muted">Open agenda slot — anything else worth raising that isn't grade-driven.</p>
+    </div>
+  );
+}
+
+function GradeBlock({ label, bucket, onOpen, onOpenCase }) {
+  return (
+    <>
+      <p style={{ fontWeight: 700, marginTop: '.8rem' }}>{label} — solutions needed ({bucket.solutions.length})</p>
+      {!bucket.solutions.length && <p className="muted">None — every {label.toLowerCase()} has a live project against it.</p>}
+      {bucket.solutions.map(w => (
+        <p key={w.key} style={{ marginTop: '.3rem' }}>
+          <button className="linklike" onClick={() => onOpen(w)}>{w.areaName} &gt; {w.critName}</button>
+        </p>
+      ))}
+      <p style={{ fontWeight: 700, marginTop: '.8rem' }}>{label} — progress updates ({bucket.progress.length})</p>
+      {!bucket.progress.length && <p className="muted">None.</p>}
+      {bucket.progress.map(w => (
+        <div key={w.key} style={{ marginTop: '.3rem' }}>
+          <button className="linklike" onClick={() => onOpen(w)}>{w.areaName} &gt; {w.critName}</button>
+          {w.projects.map(p => (
+            <p key={p.id} className="muted" style={{ marginLeft: '1rem', fontSize: '.82rem' }}>
+              <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
+              {' '}— {PACE_LABEL[p.pace] || p.pace}, owner {p.owner || '—'}
+            </p>
+          ))}
+        </div>
+      ))}
+    </>
+  );
+}
+
+function ProjectAgendaView({ pa, onOpenCase, onOpenCriterion }) {
+  if (!pa) return null;
+  const { project, area, crit, excellenceText, movement, daysAtStage, overdue } = pa;
+  const badge = statusBadge(project);
+  return (
+    <div style={{ marginTop: '.8rem' }}>
+      <h4 className="crit-card-h" style={{ marginBottom: '.4rem' }}>
+        Agenda — <button className="linklike" onClick={() => onOpenCase(project.id)}>{project.title}</button>
+      </h4>
+      <p className="muted">{area?.name} &gt; {crit?.name}</p>
+      <p><b>Status:</b> <span className={`st ${badge.cls}`}>{badge.label}</span>
+        {' '}· <b>Pace:</b> {PACE_LABEL[project.pace] || '—'} · <b>Owner:</b> {project.owner || '—'}</p>
+      <p><b>Target:</b> {fmtDate(project.due)}{overdue && <span className="overdue"> — {overdue}d overdue</span>}</p>
+      <p><b>Days at current stage:</b> {daysAtStage ?? '—'}</p>
+      {project.blocked_by && <p><b>Blocker:</b> {project.blocked_by}</p>}
+      {movement && (
+        <p style={{ color: movement.improved ? 'var(--g2)' : 'var(--g4)', fontWeight: 700 }}>
+          {movement.improved ? '🎉' : '⚠'} Grade moved {movement.from} → {movement.to}
+        </p>
+      )}
+      {excellenceText && <p className="muted"><b>Aiming for:</b> {excellenceText}</p>}
+      <button className="linklike"
+        onClick={() => onOpenCriterion({ scope: project.scope, unit_id: project.unit_id, function_id: project.function_id, criterion_id: project.criterion_id })}>
+        open criterion page →
+      </button>
+    </div>
+  );
+}
+
+function MeetingRow({ m, data, me, expanded, onToggle, onOpenCase, onCopy, onChanged }) {
   const [title, setTitle] = useState(m.title || '');
   const [minutes, setMinutes] = useState(m.minutes || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [askConfirm, confirmDialog] = useConfirm();
   const project = m.project_id ? data.projects.find(p => p.id === m.project_id) : null;
-  const critArea = m.kind === 'criterion'
-    ? (m.scope === 'unit' ? data.units.find(u => u.id === m.unit_id) : data.ofuncs.find(f => f.id === m.function_id))
-    : null;
-  const critName = m.kind === 'criterion'
-    ? (m.scope === 'unit' ? data.criteria.find(c => c.id === m.criterion_id) : data.ocrit.find(c => c.id === m.criterion_id))?.name
-    : null;
-  const label = m.title || (
-    m.kind === 'project' ? (project ? `Project meeting — ${project.title}` : 'Project meeting')
-    : m.kind === 'criterion' ? `Criterion meeting — ${critArea?.name || m.unit_id || m.function_id} > ${critName || m.criterion_id}`
-    : KIND_LABEL.qip);
+  const label = m.title || (m.kind === 'project' ? (project ? `Project meeting — ${project.title}` : 'Project meeting') : KIND_LABEL[m.kind] || KIND_LABEL.qip);
 
   const save = async () => {
     setBusy(true); setError('');
@@ -234,6 +285,9 @@ function MeetingRow({ m, data, expanded, onToggle, onOpenCase, onCopy, onChanged
             <button className="btn danger" disabled={busy} onClick={remove}>Delete meeting</button>
           </div>
           {error && <p className="muted" style={{ color: 'var(--g4)' }}>{error}</p>}
+
+          <MeetingDocuments meetingId={m.id} me={me} />
+
           {(m.transcript || []).length > 0 && (
             <div style={{ marginTop: '.6rem', maxHeight: 180, overflowY: 'auto' }}>
               {m.transcript.map((t, i) => <p key={i} className="muted" style={{ fontSize: '.76rem' }}>{t.text}</p>)}
@@ -242,6 +296,55 @@ function MeetingRow({ m, data, expanded, onToggle, onOpenCase, onCopy, onChanged
           {!m.transcript?.length && <p className="muted">No transcript captured — Chrome/Edge speech recognition may not have been available.</p>}
         </div>
       )}
+      {confirmDialog}
+    </div>
+  );
+}
+
+// Optional file attachment alongside pasted minutes — for when someone
+// already has a formatted doc (Word, PDF) they want to keep as-is.
+function MeetingDocuments({ meetingId, me }) {
+  const [docs, setDocs] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [askConfirm, confirmDialog] = useConfirm();
+  const fileRef = useRef(null);
+
+  const refresh = () => loadMeetingDocuments(meetingId).then(setDocs).catch(e => setError(e.message));
+  useEffect(() => { refresh(); }, [meetingId]);
+
+  const onPick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true); setError('');
+    try { await uploadMeetingDocument(meetingId, file, me); refresh(); }
+    catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  };
+  const remove = async (doc) => {
+    const ok = await askConfirm(`Delete "${doc.filename}"? This can't be undone.`, { confirmLabel: 'Delete document', danger: true });
+    if (!ok) return;
+    try { await deleteMeetingDocument(doc); refresh(); }
+    catch (err) { setError(err.message); }
+  };
+
+  return (
+    <div style={{ marginTop: '.6rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+        <label className="muted" style={{ fontSize: '.74rem' }}>Attached documents {docs.length > 0 && `(${docs.length})`}</label>
+        <button className="btn" disabled={busy} onClick={() => fileRef.current?.click()}>{busy ? 'Uploading…' : '+ Attach file'}</button>
+        <input ref={fileRef} type="file" onChange={onPick} style={{ display: 'none' }} />
+      </div>
+      {error && <p className="muted" style={{ color: 'var(--g4)' }}>{error}</p>}
+      {docs.map(d => (
+        <div key={d.id} className="docrow">
+          <span>{d.filename}</span>
+          <span className="muted"> · {d.uploaded_by || 'unknown'} · {new Date(d.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          <a className="linklike" href={meetingDocumentUrl(d.storage_path)} download={d.filename}>download</a>
+          <button className="linklike" onClick={() => remove(d)}>delete</button>
+        </div>
+      ))}
       {confirmDialog}
     </div>
   );
