@@ -37,9 +37,18 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
     return { reviewer: r, score: row?.score };
   });
 
-  const projects = data.projects.filter(p => !p.archived_at && p.scope === scope && p.criterion_id === criterion_id &&
-    (scope === 'unit' ? p.unit_id === unit_id : p.function_id === function_id));
-  const liveCount = projects.filter(p => p.status === 'live').length;
+  // Primary-home projects, plus anything "also affects"-tagged to this cell
+  // via project_links — the circle count on the matrix already includes
+  // both, so the list here needs to match or it looks like the count is
+  // wrong. Linked ones are flagged so it's clear this isn't their main home.
+  const isThisCell = (s, u, f, c) => c === criterion_id && (s === 'unit' ? u === unit_id : f === function_id);
+  const primaryProjects = data.projects.filter(p => !p.archived_at && isThisCell(p.scope, p.unit_id, p.function_id, p.criterion_id));
+  const linkedIds = new Set((data.projectLinks || [])
+    .filter(l => isThisCell(l.scope, l.unit_id, l.function_id, l.criterion_id))
+    .map(l => l.project_id));
+  const linkedProjects = data.projects.filter(p => !p.archived_at && linkedIds.has(p.id) && !primaryProjects.some(pp => pp.id === p.id));
+  const projects = [...primaryProjects.map(p => ({ p, linked: false })), ...linkedProjects.map(p => ({ p, linked: true }))];
+  const liveCount = projects.filter(({ p }) => p.status === 'live').length;
 
   // Everything below is editable in place (see EditableCriterionField) —
   // seeded content is a head start, not something that needs a code change
@@ -134,11 +143,12 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
 
       <div className="card" style={{ marginTop: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h4 className="crit-card-h">Root cause</h4>
+          <h4 className="crit-card-h">Your notes</h4>
           {!editingRC && <button className="btn" onClick={() => { setRcBody(rootCause?.body || ''); setEditingRC(true); }}>{rootCause?.body ? 'Edit' : '+ Add'}</button>}
         </div>
         <p className="muted" style={{ fontSize: '.78rem', marginTop: '.2rem' }}>
-          Why this criterion scores the way it does — the thinking behind the projects below.
+          Chris and Fleur's own analysis — separate from Claude's starting point above, which already covers
+          "why this is probably happening."
         </p>
         {editingRC ? (
           <div style={{ marginTop: '.6rem' }}>
@@ -189,14 +199,15 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
           <AddCriterionProject scope={scope} unit_id={unit_id} function_id={function_id} criterion_id={criterion_id}
             data={data} excellenceText={excellenceText} onDone={() => { setShowAdd(false); onRefresh(); }} />
         )}
-        {!projects.length && !showAdd && <p className="muted" style={{ marginTop: '.5rem' }}>No projects yet — the solutions to whatever's in root cause above.</p>}
-        {projects.map(p => {
+        {!projects.length && !showAdd && <p className="muted" style={{ marginTop: '.5rem' }}>No projects yet — the solutions to whatever's driving this score.</p>}
+        {projects.map(({ p, linked }) => {
           const badge = statusBadge(p);
           return (
             <p key={p.id} style={{ marginTop: '.5rem' }}>
               <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
               {' '}<span className={`st ${badge.cls}`}>{badge.label}</span>
               {p.owner && <span className="muted"> · owner {p.owner}</span>}
+              {linked && <span className="muted"> · also affects this criterion</span>}
             </p>
           );
         })}

@@ -207,12 +207,25 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
         )}
 
         <div className="plan-box">
+          <h4 style={{ margin: 0 }}>Project Summary</h4>
+          <p className="muted" style={{ fontSize: '.74rem', margin: '.15rem 0 .4rem' }}>
+            What this project is and why — written by whoever assigns it.
+          </p>
+          <EditableText table="projects" id={project.id} field="summary" value={project.summary}
+            placeholder="No summary yet — click to write one" multiline
+            onSaved={onRefresh} />
+        </div>
+
+        <div className="plan-box">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h4 style={{ margin: 0 }}>Plan</h4>
+            <h4 style={{ margin: 0 }}>Project Plan</h4>
             <button className="btn" onClick={copyPrompt} title="Copies a ready-made prompt describing this problem — paste it into claude.ai, then paste the answer back in below">
               {copied ? 'Copied ✓' : 'Copy prompt for Claude'}
             </button>
           </div>
+          <p className="muted" style={{ fontSize: '.74rem', margin: '.15rem 0 .4rem' }}>
+            How to actually do it — written by the owner once they've picked it up.
+          </p>
           <EditableText table="projects" id={project.id} field="suggested_solution" value={project.suggested_solution}
             placeholder="No plan yet — click to write one" multiline
             onSaved={onRefresh} />
