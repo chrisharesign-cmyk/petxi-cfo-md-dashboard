@@ -2,7 +2,7 @@
   --ink:#17222c; --ink-soft:#41505c; --paper:#f5f4ef; --card:#fff;
   --line:#ddd9cf; --line-soft:#eceadf; --xi:#D51A80;
   --g1:#D51A80; --g2:#44AFA1; --g3:#77607E; --g4:#A3393F; --icu:#7c2a30;
-  --live:#2E5FD9;
+  --live:#ABD25A;
   --mono:'IBM Plex Mono',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -44,7 +44,7 @@ table.matrix{border-collapse:separate;border-spacing:0;width:100%;min-width:1060
 .period-count{display:inline-block;font-family:var(--mono);font-size:.7rem;font-weight:600;color:#fff;background:var(--xi);border-radius:4px;padding:.2rem .5rem;margin-top:.45rem}
 tr.band td{background:var(--ink);color:#f2f0e8;text-align:left;font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;padding:.32rem .6rem;position:sticky;left:0}
 tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transform:none;margin-left:.6rem}
-.chip{font-family:var(--mono);font-weight:600;font-size:.8rem;color:#fff;width:1.85rem;height:1.85rem;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .08s}
+.chip{font-family:var(--mono);font-weight:600;font-size:.8rem;color:#fff;width:1.85rem;height:1.85rem;border:none;border-radius:50%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .08s}
 .chip:hover{transform:scale(1.12)}
 .chip.readonly{cursor:default;opacity:.9}.chip.readonly:hover{transform:none}
 .chip.empty{background:transparent;color:#b6b1a3;border:1.5px dashed var(--line);font-weight:500}
@@ -111,7 +111,7 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
   color:#b6b1a3;font-family:var(--mono);font-weight:700;font-size:.82rem;cursor:pointer;
   display:inline-flex;align-items:center;justify-content:center;transition:transform .08s}
 .circlenav:hover{transform:scale(1.12)}
-.circlenav.has-count{background:var(--live);color:#fff;border-style:solid;border-color:var(--live)}
+.circlenav.has-count{background:var(--live);color:var(--ink);border-style:solid;border-color:var(--live)}
 .live-head .sub-head{white-space:normal;line-height:1.15;text-align:center;display:block;font-size:.6rem}
 
 /* ---- modals (lock dialog, case file) ---- */
