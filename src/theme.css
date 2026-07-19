@@ -70,8 +70,8 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
    org_criteria content (state, excellence, root cause, improve-ideas,
    notes) uses this ONE scale in both view and edit mode, so switching
    modes or moving between cards never changes size/line-height/width ---- */
-.longtext{display:block;font-size:.95rem;line-height:1.75;color:var(--ink);max-width:70ch;white-space:pre-wrap;overflow-wrap:break-word}
-.longtext-area{display:block;width:100%;max-width:70ch;font-size:.95rem;line-height:1.75;min-height:11rem;resize:vertical}
+.longtext{display:block;width:100%;font-size:.95rem;line-height:1.75;color:var(--ink);white-space:pre-wrap;overflow-wrap:break-word}
+.longtext-area{display:block;width:100%;font-size:.95rem;line-height:1.75;min-height:11rem;resize:vertical}
 
 .ptable{border-collapse:collapse;width:100%}
 .ptable th{font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);text-align:left;padding:.4rem .6rem;border-bottom:2px solid var(--ink)}
@@ -190,7 +190,7 @@ div.editform textarea{font:inherit;width:100%;padding:.5rem;border:1px solid var
 /* ---- criterion page: excellence legend + "Claude's thoughts" card ---- */
 .legend-card b{display:block;font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:.35rem}
 .thoughts-card{padding:1.6rem 1.7rem;border-color:var(--g2);border-width:1.5px}
-.thoughts-card .thoughts-sub{color:var(--ink-soft);font-size:.86rem;line-height:1.6;margin:.35rem 0 0;max-width:60ch}
+.thoughts-card .thoughts-sub{color:var(--ink-soft);font-size:.86rem;line-height:1.6;margin:.35rem 0 0;width:100%}
 /* shared heading style for every card title on the criterion page, so
    "Current state", "What excellent looks like", "Root cause", "Claude's
    thoughts", "Projects" and "Meetings" all read as the same kind of label */
@@ -199,7 +199,7 @@ div.editform textarea{font:inherit;width:100%;padding:.5rem;border:1px solid var
 .thoughts-label{display:flex;align-items:center;gap:.5rem;font-family:var(--mono);font-size:.7rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--g2);margin-bottom:.5rem}
 .thoughts-label .dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--g2);flex:none}
 .thoughts-card .longtext,.legend-card .longtext,.state-card .longtext{margin-top:.6rem}
-.thoughts-list{list-style:none;margin:.6rem 0 0;padding:0;max-width:70ch}
+.thoughts-list{list-style:none;margin:.6rem 0 0;padding:0;width:100%}
 .thoughts-list li{position:relative;font-size:.95rem;line-height:1.65;color:var(--ink);padding:.4rem 0 .4rem 1.3rem}
 .thoughts-list li + li{border-top:1px solid var(--line-soft)}
 .thoughts-list li::before{content:'';position:absolute;left:0;top:.85rem;width:.4rem;height:.4rem;border-radius:50%;background:var(--g2)}
