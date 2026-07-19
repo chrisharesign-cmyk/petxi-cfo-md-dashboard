@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { REVIEWERS } from './supa';
 import { periodMeans } from './data';
-import { fmtDate, buildAreaPrompt } from './util';
+import { fmtDate, buildAreaPrompt, finalScoreFor } from './util';
 import EditableText from './EditableText';
 import Sparkline from './Sparkline';
 
@@ -22,6 +22,19 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCr
   const gradeFor = (critId) => {
     const rows = scoreRows.filter(s => s.criterion_id === critId && (scope === 'unit' ? s.unit_id === id : s.function_id === id));
     return REVIEWERS.map(r => ({ reviewer: r, row: rows.find(s => s.reviewer === r.name) }));
+  };
+  // The standard this criterion was actually judged against: the agreed
+  // final score's descriptor if one's been set, else whichever grade the
+  // reviewers' own scores currently point to (worst-of-both, same as
+  // everywhere else pre-agreement).
+  const descriptorsFor = (c) => (scope === 'unit' ? c.descriptors_by_unit?.[id] : c.descriptors_by_function?.[id]) || c.descriptors;
+  const judgedAgainst = (c, cells) => {
+    const agreed = finalScoreFor(data, {
+      scope, unit_id: scope === 'unit' ? id : null, function_id: scope === 'org' ? id : null, criterion_id: c.id,
+    });
+    const scored = cells.map(x => x.row?.score).filter(Boolean);
+    const grade = agreed || (scored.length ? Math.max(...scored) : null);
+    return grade ? descriptorsFor(c)?.[grade - 1] : null;
   };
   const table = scope === 'unit' ? 'units' : 'org_functions';
   const critTable = scope === 'unit' ? 'criteria' : 'org_criteria';
@@ -52,6 +65,7 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCr
             {criteria.map(c => {
               const cells = gradeFor(c.id);
               const snap = cells.find(x => x.row?.descriptor_snapshot)?.row?.descriptor_snapshot;
+              const judged = snap || judgedAgainst(c, cells);
               return (
                 <tr key={c.id}>
                   <td>
@@ -69,7 +83,7 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCr
                     <td key={reviewer.key}>{row ? <span className={`chip s${row.score}`} style={{ position: 'static' }}>{row.score}</span> : '—'}</td>
                   ))}
                   <td className="muted" style={{ fontSize: '.76rem' }}>
-                    {snap || <EditableText table={critTable} id={c.id} field="solution" value={c.solution} placeholder="add suggested solution" onSaved={onRefresh} />}
+                    {judged || <span className="muted">Not yet scored — nothing to judge against.</span>}
                   </td>
                 </tr>
               );
