@@ -219,14 +219,14 @@ export async function updateProjectDue(id, due) {
   if (error) throw error;
 }
 
-// current_grade is an informal, project-linked re-read of a criterion
-// between formal SAR periods — separate from the locked scores table, so
-// it never touches the official historical record. Changes are captured
-// automatically by the existing audit trigger on projects, which is what
-// the Activity tab's "what moved" section reads from.
-export async function updateCurrentGrade(id, grade) {
+// progress_rag is an informal on-track/at-risk read a project owner can set
+// any time between formal SAR periods — separate from the locked scores
+// table, so it never touches the official historical record. Changes are
+// captured automatically by the existing audit trigger on projects, which
+// is what the Activity tab's "what moved" section reads from.
+export async function updateProgressRag(id, rag) {
   const { error } = await supa.from('projects')
-    .update({ current_grade: grade, updated_at: new Date().toISOString() }).eq('id', id);
+    .update({ progress_rag: rag, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) throw error;
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadRecentActivity, overallTrend, lastQipMeeting } from './data';
-import { describeActivityRow, gradeMovement, daysInStage } from './util';
+import { describeActivityRow, ragMovementsFromRows, daysInStage, RAG_LABEL } from './util';
 import { meanGrade } from './matrixdata';
 import Sparkline from './Sparkline';
 
@@ -85,12 +85,7 @@ export default function ActivityTab({ data, onOpenCase }) {
   const [err, setErr] = useState('');
   useEffect(() => { setRows(null); loadRecentActivity(days).then(setRows).catch(e => setErr(e.message)); }, [days]);
 
-  const movements = data.projects
-    .filter(p => !p.archived_at)
-    .map(p => ({ p, m: gradeMovement(p) }))
-    .filter(x => x.m);
-  const wins = movements.filter(x => x.m.improved);
-  const regressions = movements.filter(x => !x.m.improved);
+  const { wins, slips } = ragMovementsFromRows(rows || []);
 
   const feed = (rows || [])
     .map(r => ({ row: r, d: describeActivityRow(r, data) }))
@@ -117,29 +112,29 @@ export default function ActivityTab({ data, onOpenCase }) {
 
       {rows && (
         <div className="card exec-summary" style={{ marginTop: '1rem' }}>
-          <b>{wins.length}</b> improved, <b>{regressions.length}</b> slipped, <b>{feed.length}</b> update{feed.length === 1 ? '' : 's'} logged
+          <b>{wins.length}</b> improved, <b>{slips.length}</b> slipped, <b>{feed.length}</b> update{feed.length === 1 ? '' : 's'} logged
           {stale.length > 0 && <> — <b style={{ color: 'var(--g4)' }}>{stale.length} owned project{stale.length === 1 ? '' : 's'} with no visible progress</b></>}.
         </div>
       )}
 
       <div className="card win-card" style={{ marginTop: '1rem' }}>
         <h4 className="crit-card-h">🎉 Wins {wins.length > 0 && `(${wins.length})`}</h4>
-        {!wins.length && <p className="muted" style={{ marginTop: '.5rem' }}>No re-grades logged as improved yet — use "Current read" in a project's case file to log progress as it happens.</p>}
-        {wins.map(({ p, m }) => (
-          <p key={p.id} className="win-row" style={{ marginTop: '.5rem' }}>
-            <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
-            {' '}— {areaName(p, data)}: <b style={{ color: 'var(--g2)' }}>{m.from} → {m.to}</b>
+        {!wins.length && <p className="muted" style={{ marginTop: '.5rem' }}>No progress ratings improved this window — set the RAG in a project's case file to track it as it happens.</p>}
+        {wins.map(w => (
+          <p key={w.id} className="win-row" style={{ marginTop: '.5rem' }}>
+            <button className="linklike" onClick={() => onOpenCase(w.id)}>{w.title}</button>
+            {' '}— {areaName(w, data)}: <b style={{ color: 'var(--g2)' }}><span className={`rag rag-${w.from}`} /> {RAG_LABEL[w.from]} → <span className={`rag rag-${w.to}`} /> {RAG_LABEL[w.to]}</b>
           </p>
         ))}
       </div>
 
-      {regressions.length > 0 && (
+      {slips.length > 0 && (
         <div className="card" style={{ marginTop: '1rem' }}>
-          <h4 className="crit-card-h">⚠ Slipped ({regressions.length})</h4>
-          {regressions.map(({ p, m }) => (
-            <p key={p.id} style={{ marginTop: '.5rem' }}>
-              <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
-              {' '}— {areaName(p, data)}: <b style={{ color: 'var(--g4)' }}>{m.from} → {m.to}</b>
+          <h4 className="crit-card-h">⚠ Slipped ({slips.length})</h4>
+          {slips.map(w => (
+            <p key={w.id} style={{ marginTop: '.5rem' }}>
+              <button className="linklike" onClick={() => onOpenCase(w.id)}>{w.title}</button>
+              {' '}— {areaName(w, data)}: <b style={{ color: 'var(--g4)' }}><span className={`rag rag-${w.from}`} /> {RAG_LABEL[w.from]} → <span className={`rag rag-${w.to}`} /> {RAG_LABEL[w.to]}</b>
             </p>
           ))}
         </div>

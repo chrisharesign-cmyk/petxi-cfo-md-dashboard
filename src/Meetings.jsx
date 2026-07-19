@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { startMeeting, endMeeting, loadMeetings, updateMeeting, deleteMeeting,
   markProjectDiscussed, loadMeetingDocuments, uploadMeetingDocument, deleteMeetingDocument, meetingDocumentUrl } from './data';
 import { qipAgenda, agendaCriteriaRows, projectAgenda } from './agenda';
-import { fmtDate, PACE_LABEL, statusBadge } from './util';
+import { fmtDate, PACE_LABEL, statusBadge, RAG_LABEL } from './util';
 import { useConfirm } from './Dialogs';
 
 // 'criterion' stays here only so an old row (started before this kind was
@@ -210,7 +210,7 @@ function GradeBlock({ label, bucket, onOpen, onOpenCase }) {
 
 function ProjectAgendaView({ pa, onOpenCase, onOpenCriterion }) {
   if (!pa) return null;
-  const { project, area, crit, excellenceText, movement, daysAtStage, overdue } = pa;
+  const { project, area, crit, excellenceText, progressRag, daysAtStage, overdue } = pa;
   const badge = statusBadge(project);
   return (
     <div style={{ marginTop: '.8rem' }}>
@@ -223,10 +223,8 @@ function ProjectAgendaView({ pa, onOpenCase, onOpenCriterion }) {
       <p><b>Target:</b> {fmtDate(project.due)}{overdue && <span className="overdue"> — {overdue}d overdue</span>}</p>
       <p><b>Days at current stage:</b> {daysAtStage ?? '—'}</p>
       {project.blocked_by && <p><b>Blocker:</b> {project.blocked_by}</p>}
-      {movement && (
-        <p style={{ color: movement.improved ? 'var(--g2)' : 'var(--g4)', fontWeight: 700 }}>
-          {movement.improved ? '🎉' : '⚠'} Grade moved {movement.from} → {movement.to}
-        </p>
+      {progressRag && (
+        <p><b>Progress:</b> <span className={`rag rag-${progressRag}`} /> {RAG_LABEL[progressRag]}</p>
       )}
       {excellenceText && <p className="muted"><b>Aiming for:</b> {excellenceText}</p>}
       <button className="linklike"

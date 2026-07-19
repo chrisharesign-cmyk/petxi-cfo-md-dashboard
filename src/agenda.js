@@ -1,5 +1,5 @@
 import { unitCellKey, orgCellKey, projectCellKey, worstGrades } from './data';
-import { gradeMovement, daysInStage, overdueBy } from './util';
+import { daysInStage, overdueBy } from './util';
 
 // The live QIP-meeting agenda, computed fresh off already-loaded `data` —
 // nothing here is stored, so it's always current up to the moment you open
@@ -71,7 +71,7 @@ export function projectAgenda(project, data) {
   return {
     project, area, crit,
     excellenceText: descArr?.[0],
-    movement: gradeMovement(project),
+    progressRag: project.progress_rag,
     daysAtStage: daysInStage(project.status_changed_at),
     overdue: project.due ? overdueBy(project.due) : false,
   };

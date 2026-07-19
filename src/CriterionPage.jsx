@@ -250,7 +250,6 @@ function AddCriterionProject({ scope, unit_id, function_id, criterion_id, data, 
   const [title, setTitle] = useState('');
   const [pace, setPace] = useState('rapid');
   const [owner, setOwner] = useState('');
-  const [impact, setImpact] = useState('A');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const known = [...new Set([...REVIEWERS.map(r => r.name), ...data.projects.map(p => p.owner).filter(Boolean)])];
@@ -269,7 +268,7 @@ function AddCriterionProject({ scope, unit_id, function_id, criterion_id, data, 
         title: title.trim(), scope,
         unit_id: scope === 'unit' ? unit_id : null,
         function_id: scope === 'org' ? function_id : null,
-        criterion_id, status: 'live', pace, owner: owner.trim(), impact,
+        criterion_id, status: 'live', pace, owner: owner.trim(),
         due: autoTarget(pace, data.period), grade_at_creation: grade,
       });
       onDone();
@@ -291,11 +290,6 @@ function AddCriterionProject({ scope, unit_id, function_id, criterion_id, data, 
         </select>
         <input className="formctl" list="cp-owners" placeholder="owner (required)" value={owner} onChange={e => setOwner(e.target.value)} />
         <datalist id="cp-owners">{known.map(n => <option key={n} value={n} />)}</datalist>
-        <select className="formctl" value={impact} onChange={e => setImpact(e.target.value)}>
-          <option value="G">Impact: high</option>
-          <option value="A">Impact: medium</option>
-          <option value="R">Impact: low</option>
-        </select>
       </div>
       {error && <p className="muted" style={{ color: 'var(--g4)' }}>{error}</p>}
       <button className="btn primary" disabled={busy}>Add — goes live immediately</button>

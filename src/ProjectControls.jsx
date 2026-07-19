@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supa, REVIEWERS } from './supa';
 import { promoteLive, pauseProject, resumeLive, moveBackLive,
   completeProject, cancelProject, updateProjectDue, rescheduleProject } from './data';
-import { PACE_LABEL, PACE_DESC, friendlyProjectError, fmtDate, autoTarget, upcomingQuarters, quarterLabel } from './util';
+import { PACE_LABEL, PACE_DESC, friendlyProjectError, fmtDate, autoTarget, upcomingQuarters, quarterLabel, RAG_LABEL } from './util';
 import { usePrompt } from './Dialogs';
 
 // Owner isn't limited to the two reviewers — anyone (Josh, ops staff, etc.)
@@ -108,17 +108,23 @@ export function AreaEditor({ project, data, onSaved }) {
   );
 }
 
-const IMPACT_LABEL = { G: 'High', A: 'Medium', R: 'Low' };
-export function ImpactEditor({ project, onSaved }) {
+// An informal on-track/at-risk read, R/A/G, settable any time — separate
+// from the locked SAR grade, which only moves at the start of the next
+// assessment period. Three dots, click to set, click the active one again
+// to clear.
+export function RagEditor({ project, onSaved }) {
   const save = async (val) => {
-    const { error } = await supa.from('projects').update({ impact: val || null, updated_at: new Date().toISOString() }).eq('id', project.id);
+    const { error } = await supa.from('projects').update({ progress_rag: val, updated_at: new Date().toISOString() }).eq('id', project.id);
     if (!error) onSaved?.();
   };
   return (
-    <select className="formctl" value={project.impact || ''} onClick={e => e.stopPropagation()} onChange={e => save(e.target.value)}>
-      <option value="">—</option>
-      {Object.entries(IMPACT_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-    </select>
+    <span style={{ display: 'inline-flex', gap: '.3rem', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+      {['G', 'A', 'R'].map(k => (
+        <button key={k} type="button" title={RAG_LABEL[k]}
+          className={`rag-pick rag-${k} ${project.progress_rag === k ? 'active' : ''}`}
+          onClick={() => save(project.progress_rag === k ? null : k)} />
+      ))}
+    </span>
   );
 }
 

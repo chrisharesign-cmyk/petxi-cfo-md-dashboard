@@ -194,13 +194,27 @@ export function describeChange(row) {
   return changed.map(k => `${k}: "${before[k] ?? '—'}" → "${after[k] ?? '—'}"`).join('; ');
 }
 
-// current_grade is the informal, project-linked re-read — separate from the
-// locked scores table. Non-null and different from where it started means
-// something's genuinely moved (better or worse).
-export function gradeMovement(project) {
-  const baseline = project.grade_at_creation;
-  if (project.current_grade == null || baseline == null || project.current_grade === baseline) return null;
-  return { from: baseline, to: project.current_grade, improved: project.current_grade < baseline };
+// progress_rag is an informal on-track/at-risk read a project owner can set
+// any time — separate from the locked SAR score, which only moves at the
+// start of the next assessment period. R/A/G, no in-between.
+export const RAG_LABEL = { G: 'On track', A: 'Some concern', R: 'At risk' };
+const RAG_RANK = { G: 0, A: 1, R: 2 }; // 0 = best
+
+// Scans a window of audit_log rows (already loaded for the Activity tab,
+// or a project's own feed) for RAG changes, and splits them into
+// improved-this-window vs worsened-this-window. A first-time set (no prior
+// value) isn't a movement, so it's excluded — "went from nothing to Green"
+// isn't a win, it's just someone finally rating it.
+export function ragMovementsFromRows(rows) {
+  const wins = [], slips = [];
+  rows.forEach(row => {
+    if (row.table_name !== 'projects' || row.action !== 'UPDATE') return;
+    const before = row.old_row || {}, after = row.new_row || {};
+    if (!after.progress_rag || !before.progress_rag || after.progress_rag === before.progress_rag) return;
+    const entry = { id: after.id, title: after.title, scope: after.scope, unit_id: after.unit_id, function_id: after.function_id, from: before.progress_rag, to: after.progress_rag };
+    (RAG_RANK[after.progress_rag] < RAG_RANK[before.progress_rag] ? wins : slips).push(entry);
+  });
+  return { wins, slips };
 }
 
 // Turns a raw audit_log row into a human sentence for the Activity tab.
@@ -219,10 +233,10 @@ export function describeActivityRow(row, data) {
     if (row.action === 'INSERT') return { icon: '➕', text: `New project: "${row.new_row?.title}"` };
     if (row.action !== 'UPDATE') return null;
     const before = row.old_row || {}, after = row.new_row || {};
-    if (before.current_grade !== after.current_grade && after.current_grade != null) {
-      const from = before.current_grade ?? after.grade_at_creation;
-      const improved = from != null && after.current_grade < from;
-      return { icon: improved ? '🎉' : '⚠', text: `Re-graded "${after.title}": ${from ?? '—'} → ${after.current_grade}` };
+    if (before.progress_rag !== after.progress_rag && after.progress_rag != null) {
+      const improved = before.progress_rag && RAG_RANK[after.progress_rag] < RAG_RANK[before.progress_rag];
+      const icon = !before.progress_rag ? '🚦' : improved ? '🎉' : '⚠';
+      return { icon, text: `"${after.title}" marked ${RAG_LABEL[after.progress_rag].toLowerCase()}${before.progress_rag ? ` (was ${RAG_LABEL[before.progress_rag].toLowerCase()})` : ''}` };
     }
     if (before.status !== after.status) {
       return { icon: '↪', text: `"${after.title}" moved to ${STATUS_LABEL[after.status] || after.status}${after.pace ? ` (${PACE_LABEL[after.pace]})` : ''}` };

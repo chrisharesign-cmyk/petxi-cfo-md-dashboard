@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { REVIEWERS } from './supa';
 import { addProject, markProjectDiscussed } from './data';
-import { STATUS_LABEL, PACE_LABEL, statusBadge, statusSortKey, fmtDate, overdueBy, daysInStage, isOverStageLimit, gradeMovement, autoTarget } from './util';
-import { OwnerEditor, ImpactEditor, TargetEditor, StatusMenu } from './ProjectControls';
+import { STATUS_LABEL, PACE_LABEL, statusBadge, statusSortKey, fmtDate, overdueBy, daysInStage, isOverStageLimit, RAG_LABEL, autoTarget } from './util';
+import { OwnerEditor, RagEditor, TargetEditor, StatusMenu } from './ProjectControls';
 import EditableText from './EditableText';
 
-const RAG = { G: '#97D700', A: '#E8A317', R: '#D0342C' };
 // 'potential'/'queued' aren't offered here on purpose — nothing can be
 // created in those statuses any more (everything goes straight to live),
 // and every existing row in them is already archived, so they'd always be
@@ -26,15 +25,14 @@ const COLUMNS = [
   { key: 'owner', label: 'Owner' },
   { key: 'status', label: 'Status' },
   { key: 'sar', label: 'SAR' },
-  { key: 'current', label: 'Current read' },
-  { key: 'impact', label: 'Impact' },
+  { key: 'current', label: 'Progress' },
   { key: 'stage', label: 'At stage' },
   { key: 'target', label: 'Target' },
   { key: 'blocker', label: 'Blocker' },
   { key: 'created', label: 'Added' },
   { key: 'updated', label: 'Last edited' },
 ];
-const IMPACT_RANK = { G: 0, A: 1, R: 2 };
+const RAG_RANK = { G: 0, A: 1, R: 2 };
 function sortValue(p, data, key) {
   switch (key) {
     case 'title': return p.title?.toLowerCase() || '';
@@ -42,8 +40,7 @@ function sortValue(p, data, key) {
     case 'owner': return p.owner?.toLowerCase() || '￿'; // unowned sorts last
     case 'status': return statusSortKey(p); // real timescale, not alphabetical
     case 'sar': return p.grade_at_creation ?? 99;
-    case 'current': return p.current_grade ?? p.grade_at_creation ?? 99;
-    case 'impact': return p.impact ? IMPACT_RANK[p.impact] : 99;
+    case 'current': return p.progress_rag ? RAG_RANK[p.progress_rag] : 99;
     case 'stage': return daysInStage(p.status_changed_at) ?? -1;
     case 'target': return p.due || '9999-99-99';
     case 'blocker': return p.blocked_by?.toLowerCase() || '';
@@ -85,9 +82,9 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
       if (f === 'New this period' && periodStart && new Date(p.created_at) >= periodStart) return true;
       if (f === 'To be discussed' && !p.discussed_at) return true;
       if (f === 'Mine' && p.owner === me) return true;
-      const m = gradeMovement(p);
-      if (f === 'Improved' && m?.improved) return true;
-      if (f === 'Slipped' && m && !m.improved) return true;
+      if (f === 'On track' && p.progress_rag === 'G') return true;
+      if (f === 'Some concern' && p.progress_rag === 'A') return true;
+      if (f === 'At risk' && p.progress_rag === 'R') return true;
     }
     return false;
   }).sort((a, b) => {
@@ -103,7 +100,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
         <button onClick={() => setShowAdd(s => !s)}>{showAdd ? 'Cancel' : '+ Add project'}</button>
       </div>
       <p className="muted" style={{ marginBottom: '.6rem' }}>
-        Owner, Status, Impact, Target and Blocker are all editable right here in the table. Click the project name,
+        Owner, Status, Progress, Target and Blocker are all editable right here in the table. Click the project name,
         area or "at stage" to open the full case file with notes and history. Click a column header to sort.
       </p>
 
@@ -118,7 +115,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
             {pc.label}
           </button>
         ))}
-        {['Overdue', 'New this period', 'To be discussed', 'Mine', 'Improved', 'Slipped', 'Archived'].map(f => (
+        {['Overdue', 'New this period', 'To be discussed', 'Mine', 'On track', 'Some concern', 'At risk', 'Archived'].map(f => (
           <button key={f} className={`fchip ${filters.has(f) ? 'active' : ''}`} onClick={() => toggle(f)}>
             {f}
           </button>
@@ -164,12 +161,7 @@ export default function ProjectsTab({ data, me, onRefresh, onOpenCase }) {
                   <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>
                     {p.grade_at_creation ? <span className={`chip s${p.grade_at_creation}`} style={{ position: 'static' }}>{p.grade_at_creation}</span> : '—'}
                   </td>
-                  <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>
-                    {p.current_grade
-                      ? <span className={`chip s${p.current_grade}`} style={{ position: 'static' }}>{p.current_grade}</span>
-                      : <span className="muted">same</span>}
-                  </td>
-                  <td><ImpactEditor project={p} onSaved={onRefresh} /></td>
+                  <td><RagEditor project={p} onSaved={onRefresh} /></td>
                   <td onClick={() => onOpenCase(p.id)} style={{ cursor: 'pointer' }}>
                     {showDays ? <>{days}d{overLimit && <span className="overdue"> ⚠ over 14d limit</span>}</> : '—'}
                   </td>
@@ -203,7 +195,6 @@ function AddProjectForm({ data, me, onDone }) {
   const [title, setTitle] = useState('');
   const [pace, setPace] = useState('rapid');
   const [owner, setOwner] = useState('');
-  const [impact, setImpact] = useState('A');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const known = [...new Set([...REVIEWERS.map(r => r.name), ...data.projects.map(p => p.owner).filter(Boolean)])];
@@ -228,7 +219,7 @@ function AddProjectForm({ data, me, onDone }) {
         unit_id: scope === 'unit' ? areaId : null,
         function_id: scope === 'org' ? areaId : null,
         criterion_id: criterionId,
-        status: 'live', pace, owner: owner.trim(), impact,
+        status: 'live', pace, owner: owner.trim(),
         due: autoTarget(pace, data.period), grade_at_creation: grade,
       });
       onDone();
@@ -259,11 +250,6 @@ function AddProjectForm({ data, me, onDone }) {
         </select>
         <input list="add-project-owners" placeholder="owner (required)" value={owner} onChange={e => setOwner(e.target.value)} />
         <datalist id="add-project-owners">{known.map(n => <option key={n} value={n} />)}</datalist>
-        <select value={impact} onChange={e => setImpact(e.target.value)}>
-          <option value="G">Impact: high (G)</option>
-          <option value="A">Impact: medium (A)</option>
-          <option value="R">Impact: low (R)</option>
-        </select>
       </div>
       {error && <p className="muted" style={{ color: 'var(--g4)' }}>{error}</p>}
       <button disabled={busy}>Add — goes live immediately</button>

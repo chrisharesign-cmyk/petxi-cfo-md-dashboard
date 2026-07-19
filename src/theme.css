@@ -79,8 +79,12 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .muted{color:var(--ink-soft);font-size:.8rem}
 .st{font-family:var(--mono);font-size:.64rem;font-weight:600;border-radius:4px;padding:.15rem .45rem;color:#fff;white-space:nowrap}
 .st-rapid{background:var(--g1)}.st-fix{background:var(--g2)}.st-hold{background:#77607E}.st-done{background:#30AD79}.st-embed{background:#614F56}
-.rag{display:inline-block;width:.7rem;height:.7rem;border-radius:50%}
+.rag{display:inline-block;width:.7rem;height:.7rem;border-radius:50%;vertical-align:middle;margin-bottom:.15rem}
 .rag-R{background:#D0342C}.rag-A{background:#E8A317}.rag-G{background:#97D700}
+/* the three progress dots on a case file / table row — dim until picked */
+.rag-pick{width:1.05rem;height:1.05rem;border-radius:50%;border:2px solid var(--card);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer;opacity:.35;vertical-align:middle}
+.rag-pick:hover{opacity:.7}
+.rag-pick.active{opacity:1;box-shadow:0 0 0 1.5px var(--ink)}
 .newtag{font-family:var(--mono);font-size:.6rem;font-weight:600;color:var(--xi);border:1px solid var(--xi);border-radius:3px;padding:0 .3rem;margin-left:.35rem}
 .overdue{font-family:var(--mono);font-size:.68rem;color:var(--xi);font-weight:600;white-space:nowrap}
 .fchips{display:flex;gap:.4rem;flex-wrap:wrap;margin:.2rem 0 1rem}
@@ -137,8 +141,12 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 
 /* ---- form controls + buttons inside modals (was raw browser-default styling) ---- */
 .formctl{font-family:inherit;font-size:.82rem;padding:.35rem .6rem;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink)}
-.btn{font-family:inherit;font-size:.78rem;font-weight:600;padding:.45rem .9rem;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.btn{font-family:inherit;font-size:.78rem;font-weight:600;padding:.45rem .9rem;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;transition:background .06s,color .06s,border-color .06s}
 .btn:hover{background:var(--paper)}
+/* Plain by default; colour is click feedback, not a resting status signal
+   — a row of equal-weight actions (Pause/Complete/Cancel/Archive/...)
+   shouldn't have one of them look "more correct" just by sitting there. */
+.btn:active{background:var(--ink);color:#fff;border-color:var(--ink)}
 .btn:disabled{opacity:.5;cursor:default}
 .btn.primary{background:var(--xi);color:#fff;border-color:var(--xi)}
 .btn.primary:hover{background:#b81570}

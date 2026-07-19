@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { supa, REVIEWERS } from './supa';
 import { loadNotes, addNote, editNote, promoteLive, pauseProject, resumeLive,
-  moveBackLive, completeProject, cancelProject, updateCurrentGrade, loadMeetingsForProject,
+  moveBackLive, completeProject, cancelProject, loadMeetingsForProject,
   archiveProject, unarchiveProject, markProjectDiscussed } from './data';
 import { PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
-  friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, gradeMovement } from './util';
+  friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, RAG_LABEL } from './util';
 import EditableText from './EditableText';
-import { OwnerEditor, ScheduleEditor, AreaEditor } from './ProjectControls';
+import { OwnerEditor, ScheduleEditor, AreaEditor, RagEditor } from './ProjectControls';
 import { usePrompt, useConfirm } from './Dialogs';
 import ProjectDocuments from './Documents';
 import ProjectLinks from './ProjectLinks';
 
-// The official SAR score right now — distinct from project.current_grade,
-// which is the informal, project-linked re-read between formal periods.
+// The official SAR score right now — distinct from project.progress_rag,
+// which is the informal on-track/at-risk read between formal periods.
 function officialCurrentGrade(p, data) {
   const rows = p.scope === 'unit'
     ? data.scores.filter(s => s.unit_id === p.unit_id && s.criterion_id === p.criterion_id)
@@ -108,7 +108,7 @@ export default function CaseFile({ projectId, me, data, onBack, onRefresh }) {
   const complete = async () => {
     const what = await askText('What changed? Required to mark this complete.', { confirmLabel: 'Complete' });
     if (!what) return;
-    await act(completeProject, project.id, { what_changed: what, grade_at_completion: project.current_grade ?? officialCurrentGrade(project, data) });
+    await act(completeProject, project.id, { what_changed: what, grade_at_completion: officialCurrentGrade(project, data) });
   };
   const cancel = async () => {
     const reason = await askText('Reason for cancelling — kept on record, not deleted.', { confirmLabel: 'Cancel project', danger: true });
@@ -134,7 +134,6 @@ export default function CaseFile({ projectId, me, data, onBack, onRefresh }) {
   const badge = statusBadge(project);
   const days = daysInStage(project.status_changed_at);
   const overLimit = isOverStageLimit(project, days);
-  const movement = gradeMovement(project);
   const copyPrompt = () => {
     navigator.clipboard?.writeText(buildProjectPrompt(project, data));
     setCopied(true); setTimeout(() => setCopied(false), 2500);
@@ -174,18 +173,10 @@ export default function CaseFile({ projectId, me, data, onBack, onRefresh }) {
           )}
           {!['completed', 'cancelled'].includes(project.status) && <>
             <span className="meta-sep">·</span>
-            <span title={`Informal — separate from the locked SAR score, graded ${project.grade_at_creation} at creation`}>
-              current read ⓘ <select className="formctl" value={project.current_grade ?? ''}
-                onChange={e => act(updateCurrentGrade, project.id, e.target.value ? Number(e.target.value) : null)}>
-                <option value="">— unchanged —</option>
-                {[1, 2, 3, 4].map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
+            <span title="Informal — how it's going right now. Separate from the locked SAR grade, which only updates at the start of next quarter's assessment.">
+              progress ⓘ <RagEditor project={project} onSaved={onRefresh} />
+              {project.progress_rag && <span className="muted" style={{ marginLeft: '.3rem' }}>{RAG_LABEL[project.progress_rag]}</span>}
             </span>
-            {movement && (
-              <span style={{ color: movement.improved ? 'var(--g2)' : 'var(--g4)', fontWeight: 700 }}>
-                {movement.improved ? '🎉' : '⚠'} {movement.from} → {movement.to}
-              </span>
-            )}
           </>}
         </div>
 
@@ -194,14 +185,14 @@ export default function CaseFile({ projectId, me, data, onBack, onRefresh }) {
           {project.status === 'queued' && <AgreePace project={project} data={data} act={act} />}
           {project.status === 'live' && <>
             <button className="btn" disabled={busy} onClick={() => act(pauseProject, project.id)}>Pause</button>
-            <button className="btn primary" disabled={busy} onClick={complete}>Complete</button>
+            <button className="btn" disabled={busy} onClick={complete}>Complete</button>
           </>}
-          {project.status === 'paused' && <button className="btn primary" disabled={busy} onClick={() => act(resumeLive, project.id)}>Resume — back to live</button>}
+          {project.status === 'paused' && <button className="btn" disabled={busy} onClick={() => act(resumeLive, project.id)}>Resume — back to live</button>}
           {project.status === 'completed' && <button className="btn" disabled={busy} onClick={() => act(moveBackLive, project.id)}>Moved back — regressed to live</button>}
           {['potential', 'queued', 'live', 'paused'].includes(project.status) &&
-            <button className="btn danger" disabled={busy} onClick={cancel}>Cancel</button>}
+            <button className="btn" disabled={busy} onClick={cancel}>Cancel</button>}
           {!project.discussed_at && <button className="btn" disabled={busy} onClick={() => act(markProjectDiscussed, project.id)}>Mark discussed</button>}
-          {!project.archived_at && <button className="btn danger" disabled={busy} onClick={archive}>Archive</button>}
+          {!project.archived_at && <button className="btn" disabled={busy} onClick={archive}>Archive</button>}
         </div>
         {actionError && <p className="muted" style={{ color: 'var(--g4)', marginTop: '.5rem' }}>{actionError}</p>}
         {project.status === 'completed' && (
