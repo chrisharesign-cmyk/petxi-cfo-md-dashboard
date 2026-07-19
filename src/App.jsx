@@ -43,7 +43,7 @@ export default function App() {
 }
 
 function Dashboard({ me, onLeave }) {
-  const [tab, setTab] = useState('activity');
+  const [tab, setTab] = useState('qip');
   const [periodId, setPeriodId] = useState(null);
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
@@ -153,7 +153,7 @@ function Dashboard({ me, onLeave }) {
         </div>
       </header>
       <nav className="tabs">
-        {[['activity', 'This Week'], ['qip', 'SAR'], ['projects', 'Excellence Projects'], ['meetings', 'Meetings']].map(([k, l]) => (
+        {[['qip', 'SAR'], ['projects', 'Excellence Projects'], ['meetings', 'Meetings'], ['activity', 'This Week']].map(([k, l]) => (
           <button key={k} className={tab === k ? 'active' : ''} onClick={() => { setTab(k); setAreaView(null); setCriterionView(null); }}>{l}</button>
         ))}
       </nav>

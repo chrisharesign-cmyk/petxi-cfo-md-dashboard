@@ -42,8 +42,8 @@ function TrendCard() {
   const prev = sorted[sorted.length - 2];
   const delta = last && prev ? +(prev.mean - last.mean).toFixed(2) : null; // grade 1=best, so a fall in mean = improvement
   return (
-    <div className="card" style={{ marginBottom: '1rem' }}>
-      <h4>Overall trend — org-wide mean, by period</h4>
+    <div className="card">
+      <h4 className="crit-card-h">Overall trend — org-wide mean, by period</h4>
       {sorted.length < 2
         ? <p className="muted">Not enough history yet — this fills in as periods lock.</p>
         : <>
@@ -70,7 +70,7 @@ function QipMeetingCard() {
   const days = at ? Math.floor((Date.now() - new Date(at)) / 86400000) : null;
   const overdue = days !== null && days >= QIP_MEETING_OVERDUE_DAYS;
   return (
-    <div className={`card ${overdue ? 'stale-card' : ''}`} style={{ marginBottom: '1rem' }}>
+    <div className={`card ${overdue ? 'stale-card' : ''}`} style={{ marginTop: '1rem' }}>
       {at
         ? <p>Last Fleur - QIP meeting: <b>{days}d ago</b> ({new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})
             {overdue && <span style={{ color: 'var(--g4)' }}> — overdue for a catch-up</span>}</p>
@@ -116,17 +116,17 @@ export default function ActivityTab({ data, onOpenCase }) {
       <QipMeetingCard />
 
       {rows && (
-        <div className="card exec-summary">
+        <div className="card exec-summary" style={{ marginTop: '1rem' }}>
           <b>{wins.length}</b> improved, <b>{regressions.length}</b> slipped, <b>{feed.length}</b> update{feed.length === 1 ? '' : 's'} logged
           {stale.length > 0 && <> — <b style={{ color: 'var(--g4)' }}>{stale.length} owned project{stale.length === 1 ? '' : 's'} with no visible progress</b></>}.
         </div>
       )}
 
-      <div className="card win-card">
-        <h4>🎉 Wins {wins.length > 0 && `(${wins.length})`}</h4>
-        {!wins.length && <p className="muted">No re-grades logged as improved yet — use "Current read" in a project's case file to log progress as it happens.</p>}
+      <div className="card win-card" style={{ marginTop: '1rem' }}>
+        <h4 className="crit-card-h">🎉 Wins {wins.length > 0 && `(${wins.length})`}</h4>
+        {!wins.length && <p className="muted" style={{ marginTop: '.5rem' }}>No re-grades logged as improved yet — use "Current read" in a project's case file to log progress as it happens.</p>}
         {wins.map(({ p, m }) => (
-          <p key={p.id} className="win-row">
+          <p key={p.id} className="win-row" style={{ marginTop: '.5rem' }}>
             <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
             {' '}— {areaName(p, data)}: <b style={{ color: 'var(--g2)' }}>{m.from} → {m.to}</b>
           </p>
@@ -135,9 +135,9 @@ export default function ActivityTab({ data, onOpenCase }) {
 
       {regressions.length > 0 && (
         <div className="card" style={{ marginTop: '1rem' }}>
-          <h4>⚠ Slipped ({regressions.length})</h4>
+          <h4 className="crit-card-h">⚠ Slipped ({regressions.length})</h4>
           {regressions.map(({ p, m }) => (
-            <p key={p.id}>
+            <p key={p.id} style={{ marginTop: '.5rem' }}>
               <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
               {' '}— {areaName(p, data)}: <b style={{ color: 'var(--g4)' }}>{m.from} → {m.to}</b>
             </p>
@@ -147,12 +147,12 @@ export default function ActivityTab({ data, onOpenCase }) {
 
       {stale.length > 0 && (
         <div className="card stale-card" style={{ marginTop: '1rem' }}>
-          <h4>🔇 No visible progress ({stale.length})</h4>
-          <p className="muted" style={{ marginBottom: '.5rem' }}>
+          <h4 className="crit-card-h">🔇 No visible progress ({stale.length})</h4>
+          <p className="muted" style={{ margin: '.35rem 0 .5rem' }}>
             Owned, live or on hold, but no note, status move or re-grade in the last {windowLabel}.
           </p>
           {stale.map(({ p, days }) => (
-            <p key={p.id}>
+            <p key={p.id} style={{ marginTop: '.4rem' }}>
               <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
               {' '}— {areaName(p, data)} · owner <b>{p.owner}</b>
               {days !== null && <span className="muted"> · {days}d at this stage</span>}
@@ -162,7 +162,7 @@ export default function ActivityTab({ data, onOpenCase }) {
       )}
 
       <div className="card" style={{ marginTop: '1rem' }}>
-        <h4>Activity, last {windowLabel} {feed.length > 0 && `(${feed.length})`}</h4>
+        <h4 className="crit-card-h">Activity, last {windowLabel} {feed.length > 0 && `(${feed.length})`}</h4>
         {err && <p className="muted" style={{ color: 'var(--g4)' }}>{err}</p>}
         {!err && !rows && <p className="muted">Loading…</p>}
         {rows && !feed.length && <p className="muted">Nothing logged in this window yet.</p>}
