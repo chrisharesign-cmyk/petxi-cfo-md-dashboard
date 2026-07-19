@@ -18,7 +18,7 @@ export async function loadPeriods() {
 
 // Load the whole matrix structure + one period's scores/projects in one go.
 export async function loadAll(periodId) {
-  const [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods, projectLinks] = await Promise.all([
+  const [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods, projectLinks, contentFlags] = await Promise.all([
     supa.from('units').select('*').order('sort'),
     supa.from('criteria').select('*').order('sort'),
     supa.from('org_functions').select('*').order('sort'),
@@ -28,8 +28,9 @@ export async function loadAll(periodId) {
     supa.from('projects').select('*').order('created_at', { ascending: false }),
     supa.from('sar_periods').select('*').order('starts'),
     supa.from('project_links').select('*'),
+    supa.from('content_flags').select('*'),
   ]);
-  const err = [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods, projectLinks].find(r => r.error);
+  const err = [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods, projectLinks, contentFlags].find(r => r.error);
   if (err) throw err.error;
   const period = periods.data.find(p => p.id === periodId);
   return {
@@ -38,15 +39,41 @@ export async function loadAll(periodId) {
     scores: scores.data, oscores: oscores.data,
     projects: projects.data, periods: periods.data, period,
     projectLinks: projectLinks.data,
+    contentFlags: contentFlags.data,
   };
+}
+
+// ---- grade-change flags: whenever a cell's worst-of-both-reviewers grade
+// moves, the content written for the new grade may not have been written
+// (or written for the old situation) — flag it so CriterionPage can show a
+// "this grading change needs review" banner instead of silently showing
+// whatever's sitting in that grade's slot. One open flag per cell; the
+// unique index lets a second grade change just replace it.
+export async function flagGradeChange({ scope, unit_id, function_id, criterion_id, old_grade, new_grade }) {
+  if (!new_grade) return;
+  const { error } = await supa.from('content_flags')
+    .upsert({ scope, unit_id: unit_id || '', function_id: function_id || '', criterion_id, old_grade, new_grade, flagged_at: new Date().toISOString() },
+            { onConflict: 'scope,unit_id,function_id,criterion_id' });
+  if (error) throw error;
+}
+export async function clearContentFlag({ scope, unit_id, function_id, criterion_id }) {
+  const { error } = await supa.from('content_flags').delete()
+    .match({ scope, unit_id: unit_id || '', function_id: function_id || '', criterion_id });
+  if (error) throw error;
 }
 
 // ---- draft scoring (blocked once the period is locked — caller must check) ----
 export async function setScore({ criterion_id, unit_id, score, reviewer, period_id, week = weekStart() }) {
+  const { data: existing } = await supa.from('scores').select('reviewer,score')
+    .match({ criterion_id, unit_id, week_start: week, period_id });
+  const oldGrade = existing?.length ? Math.max(...existing.map(s => s.score)) : null;
   const { error } = await supa.from('scores')
     .upsert({ criterion_id, unit_id, week_start: week, period_id, score, reviewer, updated_at: new Date().toISOString() },
             { onConflict: 'criterion_id,unit_id,week_start,reviewer' });
   if (error) throw error;
+  const others = (existing || []).filter(s => s.reviewer !== reviewer).map(s => s.score);
+  const newGrade = Math.max(score, ...others, 0) || null;
+  if (newGrade !== oldGrade) await flagGradeChange({ scope: 'unit', unit_id, criterion_id, old_grade: oldGrade, new_grade: newGrade });
 }
 export async function clearScore({ criterion_id, unit_id, reviewer, period_id, week = weekStart() }) {
   const { error } = await supa.from('scores').delete()
@@ -54,10 +81,16 @@ export async function clearScore({ criterion_id, unit_id, reviewer, period_id, w
   if (error) throw error;
 }
 export async function setOrgScore({ function_id, criterion_id, score, reviewer, period_id, week = weekStart() }) {
+  const { data: existing } = await supa.from('org_scores').select('reviewer,score')
+    .match({ function_id, criterion_id, week_start: week, period_id });
+  const oldGrade = existing?.length ? Math.max(...existing.map(s => s.score)) : null;
   const { error } = await supa.from('org_scores')
     .upsert({ function_id, criterion_id, week_start: week, period_id, score, reviewer, updated_at: new Date().toISOString() },
             { onConflict: 'function_id,criterion_id,week_start,reviewer' });
   if (error) throw error;
+  const others = (existing || []).filter(s => s.reviewer !== reviewer).map(s => s.score);
+  const newGrade = Math.max(score, ...others, 0) || null;
+  if (newGrade !== oldGrade) await flagGradeChange({ scope: 'org', function_id, criterion_id, old_grade: oldGrade, new_grade: newGrade });
 }
 export async function clearOrgScore({ function_id, criterion_id, reviewer, period_id, week = weekStart() }) {
   const { error } = await supa.from('org_scores').delete()

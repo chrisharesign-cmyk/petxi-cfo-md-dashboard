@@ -8,7 +8,12 @@ import { supa } from './supa';
 // the FULL replacement value for that column — buildNewValue computes it
 // client-side from the row already held in `data`, and the caller (which
 // knows the shape) supplies that function.
-export default function EditableCriterionField({ table, id, column, value, buildNewValue, onSaved, placeholder, multiline = true, tag = 'div', renderValue }) {
+//
+// View and edit modes share one type scale (the .longtext class in
+// theme.css) so switching between them doesn't change font size, line
+// height or width — that mismatch was the root of the "text looks fine in
+// the editor but wraps oddly when viewing" report.
+export default function EditableCriterionField({ table, id, column, value, buildNewValue, onSaved, placeholder, multiline = true, tag = 'div', renderValue, rows = 9 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || '');
   const [busy, setBusy] = useState(false);
@@ -30,8 +35,8 @@ export default function EditableCriterionField({ table, id, column, value, build
 
   if (!editing) {
     return (
-      <Tag className="editable" onClick={() => { setDraft(value || ''); setEditing(true); }} title="Click to edit"
-        style={multiline && !renderValue ? { whiteSpace: 'pre-wrap' } : undefined}>
+      <Tag className={multiline && !renderValue ? 'editable longtext' : 'editable'}
+        onClick={() => { setDraft(value || ''); setEditing(true); }} title="Click to edit">
         {value
           ? (renderValue ? renderValue(value) : value)
           : <span className="muted">{placeholder || '— click to add —'}</span>}
@@ -41,15 +46,15 @@ export default function EditableCriterionField({ table, id, column, value, build
   return (
     <Tag className="editform" style={{ display: 'block' }}>
       {multiline
-        ? <textarea value={draft} onChange={e => setDraft(e.target.value)} autoFocus rows={4} style={{ width: '100%' }}
+        ? <textarea className="formctl longtext-area" value={draft} onChange={e => setDraft(e.target.value)} autoFocus rows={rows}
             onKeyDown={e => { if (e.key === 'Escape') setEditing(false); }} />
-        : <input value={draft} onChange={e => setDraft(e.target.value)} autoFocus style={{ width: '100%' }}
+        : <input className="formctl" value={draft} onChange={e => setDraft(e.target.value)} autoFocus style={{ width: '100%' }}
             onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }} />}
-      <div style={{ marginTop: '.3rem' }}>
-        <button disabled={busy} onClick={save}>Save</button>
-        <button type="button" onClick={() => setEditing(false)}>Cancel</button>
+      <div style={{ marginTop: '.4rem', display: 'flex', gap: '.5rem' }}>
+        <button className="btn primary" disabled={busy} onClick={save}>Save</button>
+        <button className="btn" type="button" onClick={() => setEditing(false)}>Cancel</button>
       </div>
-      {error && <span className="muted" style={{ color: 'var(--g4)', display: 'block', width: '100%' }}>{error}</span>}
+      {error && <span className="muted" style={{ color: 'var(--g4)', display: 'block', width: '100%', marginTop: '.3rem' }}>{error}</span>}
     </Tag>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { REVIEWERS } from './supa';
-import { loadRootCause, saveRootCause, periodMeansForCriterion, loadMeetingsForCriterion, addProject } from './data';
+import { loadRootCause, saveRootCause, periodMeansForCriterion, loadMeetingsForCriterion, addProject, clearContentFlag } from './data';
 import { fmtDate, autoTarget, statusBadge, PACE_LABEL } from './util';
 import Sparkline from './Sparkline';
 import EditableCriterionField from './EditableCriterionField';
@@ -68,6 +68,8 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
 
   const currentGrade = Math.max(0, ...scoreCells.map(c => c.score || 0)) || null;
   const gradeIdx = currentGrade ? currentGrade - 1 : null;
+  const flag = (data.contentFlags || []).find(f => f.scope === scope && f.criterion_id === criterion_id &&
+    (scope === 'unit' ? f.unit_id === unit_id : f.function_id === function_id));
   const currentStateText = gradeIdx !== null ? descArr[gradeIdx] : null;
   const excellenceText = descArr[0];
   const likelyCauseText = causeArr[gradeIdx ?? 0];
@@ -105,6 +107,19 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
         <span className="bar" style={{ background: 'var(--g2)' }} />
         {area?.name} &gt; {crit?.name}
       </div>
+
+      {flag && (
+        <div className="card flag-card" style={{ marginBottom: '1rem' }}>
+          <p className="flag-text">
+            ⚠ Grade changed from {flag.old_grade ?? '–'} to {flag.new_grade} — the content below is whatever was
+            last written for grade {flag.new_grade} and may not fit the new situation yet. Review it, or dismiss
+            this once it's been checked.
+          </p>
+          <button className="btn" onClick={() => clearContentFlag({ scope, unit_id, function_id, criterion_id }).then(onRefresh)}>
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="card" style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: '1.4rem' }}>
@@ -152,7 +167,7 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
         </p>
         {editingRC ? (
           <div style={{ marginTop: '.6rem' }}>
-            <textarea className="formctl" rows={5} style={{ width: '100%' }} value={rcBody} onChange={e => setRcBody(e.target.value)} autoFocus />
+            <textarea className="formctl longtext-area" rows={9} value={rcBody} onChange={e => setRcBody(e.target.value)} autoFocus />
             <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem' }}>
               <button className="btn primary" disabled={rcBusy} onClick={saveRC}>Save</button>
               <button className="btn" onClick={() => setEditingRC(false)}>Cancel</button>
@@ -160,7 +175,7 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
           </div>
         ) : (
           rootCause?.body
-            ? <p style={{ marginTop: '.5rem', whiteSpace: 'pre-wrap' }}>{rootCause.body}</p>
+            ? <p className="longtext" style={{ marginTop: '.5rem' }}>{rootCause.body}</p>
             : <p className="muted" style={{ marginTop: '.5rem' }}>Nothing written yet.</p>
         )}
       </div>
