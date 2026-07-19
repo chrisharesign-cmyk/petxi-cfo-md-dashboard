@@ -27,7 +27,7 @@ export async function loadAll(periodId) {
     supa.from('org_scores').select('*').eq('period_id', periodId),
     supa.from('projects').select('*').order('created_at', { ascending: false }),
     supa.from('sar_periods').select('*').order('starts'),
-    supa.from('project_links').select('*'),
+    supa.from('project_links').select('*').eq('confirmed', true),
     supa.from('content_flags').select('*'),
   ]);
   const err = [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods, projectLinks, contentFlags].find(r => r.error);
@@ -378,13 +378,21 @@ export async function loadProjectLinks(projectId) {
   if (error) throw error;
   return data;
 }
-export async function addProjectLink(projectId, { scope, unit_id, function_id, criterion_id }, createdBy) {
+// confirmed defaults true — the normal "+ Add area" flow tags something the
+// person typing it already believes. Suggested links (confirmed: false,
+// with a note explaining the reasoning) are for judgment calls that aren't
+// mine to make alone — a person reviews and confirms or dismisses each one.
+export async function addProjectLink(projectId, { scope, unit_id, function_id, criterion_id }, createdBy, { confirmed = true, note = null } = {}) {
   const { error } = await supa.from('project_links').insert({
     project_id: projectId, scope,
     unit_id: scope === 'unit' ? unit_id : null,
     function_id: scope === 'org' ? function_id : null,
-    criterion_id, created_by: createdBy,
+    criterion_id, created_by: createdBy, confirmed, note,
   });
+  if (error) throw error;
+}
+export async function confirmProjectLinks(ids) {
+  const { error } = await supa.from('project_links').update({ confirmed: true }).in('id', ids);
   if (error) throw error;
 }
 export async function removeProjectLink(id) {
