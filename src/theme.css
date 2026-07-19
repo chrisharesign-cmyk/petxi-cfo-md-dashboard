@@ -25,12 +25,12 @@ nav.tabs{background:var(--ink);display:flex;gap:.2rem;padding:0 2rem;border-top:
 nav.tabs button{font-weight:600;font-size:.82rem;color:#8b959e;background:none;border:none;border-bottom:3px solid transparent;padding:.7rem 1rem .6rem;cursor:pointer;white-space:nowrap}
 nav.tabs button.active{color:#f2f0e8;border-bottom-color:var(--xi)}
 .wrap{max-width:1280px;margin:1.5rem auto 4rem;padding:0 1.2rem}
-.board{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto;box-shadow:0 1px 3px rgba(23,34,44,.06)}
+.board{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow-x:auto;overflow-y:visible;box-shadow:0 1px 3px rgba(23,34,44,.06)}
 table.matrix{border-collapse:separate;border-spacing:0;width:100%;min-width:1060px;table-layout:fixed}
 .matrix th,.matrix td{padding:.42rem .3rem;text-align:center;border-bottom:1px solid var(--line-soft)}
-.matrix thead th{background:var(--card);position:sticky;z-index:3;vertical-align:bottom}
-.matrix thead tr:first-child th{top:0}
-.crit-col{text-align:left;min-width:215px;position:sticky;left:0;background:var(--card);z-index:4}
+.matrix thead{position:sticky;top:0;z-index:5}
+.matrix thead th{background:var(--card);vertical-align:bottom}
+.crit-col{text-align:left;min-width:215px;position:sticky;left:0;background:var(--card);z-index:6}
 .matrix td.crit{text-align:left;font-size:.83rem;font-weight:500;position:sticky;left:0;background:var(--card);z-index:2;border-right:1px solid var(--line-soft);padding-left:.6rem;cursor:help}
 .usep{border-right:1px solid var(--line)}
 .unit-name{font-weight:800;font-size:.8rem;line-height:1.2;display:block;cursor:pointer;background:none;border:none;color:inherit;font-family:inherit;padding:0;text-align:center;width:100%}
@@ -192,6 +192,10 @@ div.editform textarea{font:inherit;width:100%;padding:.5rem;border:1px solid var
 .thoughts-list li{position:relative;font-size:.95rem;line-height:1.65;color:var(--ink);padding:.4rem 0 .4rem 1.3rem}
 .thoughts-list li + li{border-top:1px solid var(--line-soft)}
 .thoughts-list li::before{content:'';position:absolute;left:0;top:.85rem;width:.4rem;height:.4rem;border-radius:50%;background:var(--g2)}
+.state-card{border-color:var(--line);}
+.state-label{display:flex;align-items:center;gap:.5rem;font-family:var(--mono);font-size:.7rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:.5rem}
+.state-label .gradepill{font-family:var(--mono);font-weight:700;color:#fff;border-radius:4px;padding:.1rem .5rem;font-size:.72rem}
+.state-card .editable{font-size:.95rem;line-height:1.7;display:block}
 
 /* ---- mobile ---- */
 @media (max-width: 720px){

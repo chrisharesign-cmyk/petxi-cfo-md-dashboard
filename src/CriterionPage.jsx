@@ -3,6 +3,7 @@ import { REVIEWERS } from './supa';
 import { loadRootCause, saveRootCause, periodMeansForCriterion, loadMeetingsForCriterion, addProject } from './data';
 import { fmtDate, autoTarget, statusBadge, PACE_LABEL } from './util';
 import Sparkline from './Sparkline';
+import EditableCriterionField from './EditableCriterionField';
 
 // One criterion's own page: current scores, trend, root cause (why it
 // scores the way it does) and every project (solution) against it — the
@@ -39,15 +40,48 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
   const projects = data.projects.filter(p => !p.archived_at && p.scope === scope && p.criterion_id === criterion_id &&
     (scope === 'unit' ? p.unit_id === unit_id : p.function_id === function_id));
   const liveCount = projects.filter(p => p.status === 'live').length;
-  const excellenceText = scope === 'unit'
-    ? (crit?.descriptors_by_unit?.[unit_id] || crit?.descriptors)?.[0]
-    : crit?.descriptors?.[0];
-  const improveText = scope === 'unit'
-    ? (crit?.solution_by_unit?.[unit_id] || crit?.solution)
-    : (crit?.solution_by_function?.[function_id] || crit?.solution);
-  const likelyCauseText = scope === 'unit'
-    ? (crit?.likely_cause_by_unit?.[unit_id] || crit?.likely_cause)
-    : (crit?.likely_cause_by_function?.[function_id] || crit?.likely_cause);
+
+  // Everything below is editable in place (see EditableCriterionField) —
+  // seeded content is a head start, not something that needs a code change
+  // to correct. table/areaKey/*Col pick out where in the row each field
+  // lives; descriptors and likely_cause are one text per grade (1-4) so
+  // "what this currently looks like" and "why" can track whichever grade
+  // is actually scored, not just the aspirational top grade.
+  const table = scope === 'unit' ? 'criteria' : 'org_criteria';
+  const areaKey = scope === 'unit' ? unit_id : function_id;
+  const descCol = scope === 'unit' ? 'descriptors_by_unit' : 'descriptors_by_function';
+  const causeCol = scope === 'unit' ? 'likely_cause_by_unit' : 'likely_cause_by_function';
+  const solCol = scope === 'unit' ? 'solution_by_unit' : 'solution_by_function';
+
+  const descArr = crit?.[descCol]?.[areaKey] || crit?.descriptors || ['', '', '', ''];
+  const causeArr = crit?.[causeCol]?.[areaKey] || crit?.likely_cause || ['', '', '', ''];
+  const improveText = crit?.[solCol]?.[areaKey] ?? crit?.solution ?? '';
+
+  const currentGrade = Math.max(0, ...scoreCells.map(c => c.score || 0)) || null;
+  const gradeIdx = currentGrade ? currentGrade - 1 : null;
+  const currentStateText = gradeIdx !== null ? descArr[gradeIdx] : null;
+  const excellenceText = descArr[0];
+  const likelyCauseText = causeArr[gradeIdx ?? 0];
+
+  const buildDescValue = idx => draft => {
+    const base = { ...(crit?.[descCol] || {}) };
+    const arr = [...(base[areaKey] || crit?.descriptors || ['', '', '', ''])];
+    arr[idx] = draft;
+    base[areaKey] = arr;
+    return base;
+  };
+  const buildCauseValue = idx => draft => {
+    const base = { ...(crit?.[causeCol] || {}) };
+    const arr = [...(base[areaKey] || crit?.likely_cause || ['', '', '', ''])];
+    arr[idx] = draft;
+    base[areaKey] = arr;
+    return base;
+  };
+  const buildSolutionValue = draft => {
+    const base = { ...(crit?.[solCol] || {}) };
+    base[areaKey] = draft;
+    return base;
+  };
 
   const saveRC = async () => {
     setRcBusy(true);
@@ -81,37 +115,47 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
         </div>
       </div>
 
-      {excellenceText && (
-        <div className="card legend-card" style={{ marginTop: '1rem' }}>
-          <b>What excellent looks like</b> {excellenceText}
+      {currentGrade && (
+        <div className="card state-card" style={{ marginTop: '1rem' }}>
+          <div className="state-label">
+            <span className="gradepill" style={{ background: `var(--g${currentGrade})` }}>{currentGrade}</span>
+            What this currently looks like
+          </div>
+          <EditableCriterionField table={table} id={criterion_id} column={descCol} value={currentStateText}
+            buildNewValue={buildDescValue(gradeIdx)} onSaved={onRefresh} placeholder="— click to describe the current reality —" />
         </div>
       )}
 
-      {(improveText || likelyCauseText) && (
-        <div className="card thoughts-card" style={{ marginTop: '1rem' }}>
-          <h4>Claude's initial thoughts on how to improve</h4>
-          <p className="thoughts-sub">
-            A starting point for this {scope === 'unit' ? 'unit' : 'horizontal'} — worth challenging, not just
-            following. Applies whatever the current grade; there's always a next step.
-          </p>
-          {likelyCauseText && (
-            <div className="thoughts-sec">
-              <div className="thoughts-label"><span className="dot" />Why this is probably happening</div>
-              <p>{likelyCauseText}</p>
-            </div>
-          )}
-          {improveText && (
-            <div className="thoughts-sec">
-              <div className="thoughts-label"><span className="dot" />What could help</div>
+      <div className="card legend-card" style={{ marginTop: '1rem' }}>
+        <b>What excellent looks like</b>
+        <EditableCriterionField table={table} id={criterion_id} column={descCol} value={excellenceText}
+          buildNewValue={buildDescValue(0)} onSaved={onRefresh} placeholder="— click to describe grade 1 —" />
+      </div>
+
+      <div className="card thoughts-card" style={{ marginTop: '1rem' }}>
+        <h4>Claude's initial thoughts on how to improve</h4>
+        <p className="thoughts-sub">
+          A starting point for this {scope === 'unit' ? 'unit' : 'horizontal'} — worth challenging, not just
+          following, and fully editable below. {currentGrade ? 'Tracks the currently graded score.' : "Applies whatever the current grade; there's always a next step."}
+        </p>
+        <div className="thoughts-sec">
+          <div className="thoughts-label"><span className="dot" />Why this is probably happening{currentGrade ? ` (at grade ${currentGrade})` : ''}</div>
+          <EditableCriterionField table={table} id={criterion_id} column={causeCol} value={likelyCauseText}
+            buildNewValue={buildCauseValue(gradeIdx ?? 0)} onSaved={onRefresh} placeholder="— click to add —" />
+        </div>
+        <div className="thoughts-sec">
+          <div className="thoughts-label"><span className="dot" />What could help</div>
+          <EditableCriterionField table={table} id={criterion_id} column={solCol} value={improveText}
+            buildNewValue={buildSolutionValue} onSaved={onRefresh} placeholder="— click to add ideas, one per line —"
+            renderValue={v => (
               <ul className="thoughts-list">
-                {improveText.split('\n').map(line => line.replace(/^[\s-]+/, '').trim()).filter(Boolean).map((line, i) => (
+                {v.split('\n').map(line => line.replace(/^[\s-]+/, '').trim()).filter(Boolean).map((line, i) => (
                   <li key={i}>{line}</li>
                 ))}
               </ul>
-            </div>
-          )}
+            )} />
         </div>
-      )}
+      </div>
 
       <div className="card" style={{ marginTop: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
