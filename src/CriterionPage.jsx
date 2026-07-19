@@ -117,23 +117,46 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
 
       {currentGrade && (
         <div className="card state-card" style={{ marginTop: '1rem' }}>
-          <div className="state-label">
+          <h4 className="crit-card-h">
             <span className="gradepill" style={{ background: `var(--g${currentGrade})` }}>{currentGrade}</span>
             What this currently looks like
-          </div>
+          </h4>
           <EditableCriterionField table={table} id={criterion_id} column={descCol} value={currentStateText}
             buildNewValue={buildDescValue(gradeIdx)} onSaved={onRefresh} placeholder="— click to describe the current reality —" />
         </div>
       )}
 
       <div className="card legend-card" style={{ marginTop: '1rem' }}>
-        <b>What excellent looks like</b>
+        <h4 className="crit-card-h">What excellent looks like</h4>
         <EditableCriterionField table={table} id={criterion_id} column={descCol} value={excellenceText}
           buildNewValue={buildDescValue(0)} onSaved={onRefresh} placeholder="— click to describe grade 1 —" />
       </div>
 
+      <div className="card" style={{ marginTop: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h4 className="crit-card-h">Root cause</h4>
+          {!editingRC && <button className="btn" onClick={() => { setRcBody(rootCause?.body || ''); setEditingRC(true); }}>{rootCause?.body ? 'Edit' : '+ Add'}</button>}
+        </div>
+        <p className="muted" style={{ fontSize: '.78rem', marginTop: '.2rem' }}>
+          Why this criterion scores the way it does — the thinking behind the projects below.
+        </p>
+        {editingRC ? (
+          <div style={{ marginTop: '.6rem' }}>
+            <textarea className="formctl" rows={5} style={{ width: '100%' }} value={rcBody} onChange={e => setRcBody(e.target.value)} autoFocus />
+            <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem' }}>
+              <button className="btn primary" disabled={rcBusy} onClick={saveRC}>Save</button>
+              <button className="btn" onClick={() => setEditingRC(false)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          rootCause?.body
+            ? <p style={{ marginTop: '.5rem', whiteSpace: 'pre-wrap' }}>{rootCause.body}</p>
+            : <p className="muted" style={{ marginTop: '.5rem' }}>Nothing written yet.</p>
+        )}
+      </div>
+
       <div className="card thoughts-card" style={{ marginTop: '1rem' }}>
-        <h4>Claude's initial thoughts on how to improve</h4>
+        <h4 className="crit-card-h">Claude's initial thoughts on how to improve</h4>
         <p className="thoughts-sub">
           A starting point for this {scope === 'unit' ? 'unit' : 'horizontal'} — worth challenging, not just
           following, and fully editable below. {currentGrade ? 'Tracks the currently graded score.' : "Applies whatever the current grade; there's always a next step."}
@@ -159,30 +182,7 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
 
       <div className="card" style={{ marginTop: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h4 style={{ margin: 0 }}>Root cause</h4>
-          {!editingRC && <button className="btn" onClick={() => { setRcBody(rootCause?.body || ''); setEditingRC(true); }}>{rootCause?.body ? 'Edit' : '+ Add'}</button>}
-        </div>
-        <p className="muted" style={{ fontSize: '.78rem', marginTop: '.2rem' }}>
-          Why this criterion scores the way it does — the thinking behind the projects below.
-        </p>
-        {editingRC ? (
-          <div style={{ marginTop: '.6rem' }}>
-            <textarea className="formctl" rows={5} style={{ width: '100%' }} value={rcBody} onChange={e => setRcBody(e.target.value)} autoFocus />
-            <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem' }}>
-              <button className="btn primary" disabled={rcBusy} onClick={saveRC}>Save</button>
-              <button className="btn" onClick={() => setEditingRC(false)}>Cancel</button>
-            </div>
-          </div>
-        ) : (
-          rootCause?.body
-            ? <p style={{ marginTop: '.5rem', whiteSpace: 'pre-wrap' }}>{rootCause.body}</p>
-            : <p className="muted" style={{ marginTop: '.5rem' }}>Nothing written yet.</p>
-        )}
-      </div>
-
-      <div className="card" style={{ marginTop: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h4 style={{ margin: 0 }}>Projects ({projects.length})</h4>
+          <h4 className="crit-card-h">Projects ({projects.length})</h4>
           <button className="btn" onClick={() => setShowAdd(s => !s)}>{showAdd ? 'Cancel' : '+ Add project'}</button>
         </div>
         {showAdd && (
@@ -204,7 +204,7 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
 
       {meetings.length > 0 && (
         <div className="card" style={{ marginTop: '1rem' }}>
-          <h4>Meetings ({meetings.length})</h4>
+          <h4 className="crit-card-h">Meetings ({meetings.length})</h4>
           {meetings.map(m => (
             <p key={m.id} className="muted">{fmtDate(m.started_at?.slice(0, 10))} — {m.title || 'Meeting'}</p>
           ))}
