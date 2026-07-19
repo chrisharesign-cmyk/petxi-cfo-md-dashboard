@@ -36,29 +36,30 @@ function TrendCard() {
   const [err, setErr] = useState('');
   useEffect(() => { overallTrend().then(setTrend).catch(e => setErr(e.message)); }, []);
   if (err) return null;
-  if (!trend) return <div className="card" style={{ marginBottom: '1rem' }}><p className="muted">Loading trend…</p></div>;
-  const sorted = [...trend].sort((a, b) => a.period_id.localeCompare(b.period_id));
+  const sorted = trend ? [...trend].sort((a, b) => a.period_id.localeCompare(b.period_id)) : [];
   const last = sorted[sorted.length - 1];
   const prev = sorted[sorted.length - 2];
   const delta = last && prev ? +(prev.mean - last.mean).toFixed(2) : null; // grade 1=best, so a fall in mean = improvement
   return (
-    <div className="card">
-      <h4 className="crit-card-h">Overall trend — org-wide mean, by period</h4>
-      {sorted.length < 2
-        ? <p className="muted">Not enough history yet — this fills in as periods lock.</p>
-        : <>
-            <Sparkline points={sorted.map(s => ({ mean: s.mean }))} />
-            <p className="muted">
-              This period: <b style={{ color: `var(--g${meanGrade(last.mean)})` }}>{last.mean.toFixed(2)}</b>
+    <div className="card stat-card">
+      <span className="stat-label">Overall trend, by period</span>
+      {!trend
+        ? <p className="muted">Loading…</p>
+        : sorted.length < 2
+          ? <p className="muted">Not enough history yet — this fills in as periods lock.</p>
+          : <>
+              <span className="stat-value" style={{ color: `var(--g${meanGrade(last.mean)})` }}>{last.mean.toFixed(2)}</span>
+              <div style={{ marginTop: '.5rem' }}><Sparkline points={sorted.map(s => ({ mean: s.mean }))} /></div>
               {prev && (
-                delta > 0
-                  ? <> — improved {Math.abs(delta).toFixed(2)} vs last period ({prev.label || prev.period_id})</>
-                  : delta < 0
-                    ? <> — slipped {Math.abs(delta).toFixed(2)} vs last period ({prev.label || prev.period_id})</>
-                    : <> — unchanged vs last period ({prev.label || prev.period_id})</>
+                <p className="muted" style={{ marginTop: '.4rem' }}>
+                  {delta > 0
+                    ? <>improved {Math.abs(delta).toFixed(2)} vs {prev.label || prev.period_id}</>
+                    : delta < 0
+                      ? <>slipped {Math.abs(delta).toFixed(2)} vs {prev.label || prev.period_id}</>
+                      : <>unchanged vs {prev.label || prev.period_id}</>}
+                </p>
               )}
-            </p>
-          </>}
+            </>}
     </div>
   );
 }
@@ -66,15 +67,20 @@ function TrendCard() {
 function QipMeetingCard() {
   const [at, setAt] = useState(undefined); // undefined = loading, null = none yet
   useEffect(() => { lastQipMeeting().then(setAt).catch(() => setAt(null)); }, []);
-  if (at === undefined) return null;
   const days = at ? Math.floor((Date.now() - new Date(at)) / 86400000) : null;
   const overdue = days !== null && days >= QIP_MEETING_OVERDUE_DAYS;
   return (
-    <div className={`card ${overdue ? 'stale-card' : ''}`} style={{ marginTop: '1rem' }}>
-      {at
-        ? <p>Last Fleur - QIP meeting: <b>{days}d ago</b> ({new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})
-            {overdue && <span style={{ color: 'var(--g4)' }}> — overdue for a catch-up</span>}</p>
-        : <p className="muted">No Fleur - QIP meeting recorded yet — record one from the Meetings tab.</p>}
+    <div className={`card stat-card ${overdue ? 'stale-card' : ''}`}>
+      <span className="stat-label">Last Fleur · QIP meeting</span>
+      {at === undefined && <p className="muted">Loading…</p>}
+      {at === null && <p className="muted">None recorded yet — record one from the Meetings tab.</p>}
+      {at && <>
+        <span className="stat-value">{days}d ago</span>
+        <p className="muted" style={{ marginTop: '.4rem' }}>
+          {new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+          {overdue && <span style={{ color: 'var(--g4)', fontWeight: 600 }}> — overdue for a catch-up</span>}
+        </p>
+      </>}
     </div>
   );
 }
@@ -108,8 +114,10 @@ export default function ActivityTab({ data, onOpenCase }) {
         over the last {windowLabel}.
       </p>
 
-      <TrendCard />
-      <QipMeetingCard />
+      <div className="stat-grid">
+        <TrendCard />
+        <QipMeetingCard />
+      </div>
 
       {rows && summary && (
         <div className="card exec-summary" style={{ marginTop: '1rem' }}>
@@ -123,23 +131,41 @@ export default function ActivityTab({ data, onOpenCase }) {
       <div className="card win-card" style={{ marginTop: '1rem' }}>
         <h4 className="crit-card-h">🎉 Wins {wins.length > 0 && `(${wins.length})`}</h4>
         {!wins.length && <p className="muted" style={{ marginTop: '.5rem' }}>No progress ratings improved this window — set the RAG in a project's case file to track it as it happens.</p>}
-        {wins.map(w => (
-          <p key={w.id} className="win-row" style={{ marginTop: '.5rem' }}>
-            <button className="linklike" onClick={() => onOpenCase(w.id)}>{w.title}</button>
-            {' '}— {areaName(w, data)}: <b style={{ color: 'var(--g2)' }}><span className={`rag rag-${w.from}`} /> {RAG_LABEL[w.from]} → <span className={`rag rag-${w.to}`} /> {RAG_LABEL[w.to]}</b>
-          </p>
-        ))}
+        {wins.length > 0 && (
+          <div style={{ marginTop: '.3rem' }}>
+            {wins.map(w => (
+              <div key={w.id} className="activity-row">
+                <span className="ico">🎉</span>
+                <div>
+                  <button className="linklike" onClick={() => onOpenCase(w.id)}>{w.title}</button>
+                  <span className="muted"> — {areaName(w, data)}</span>
+                  <div className="muted" style={{ marginTop: '.15rem' }}>
+                    <span className={`rag rag-${w.from}`} /> {RAG_LABEL[w.from]} → <span className={`rag rag-${w.to}`} /> {RAG_LABEL[w.to]}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {slips.length > 0 && (
         <div className="card" style={{ marginTop: '1rem' }}>
           <h4 className="crit-card-h">⚠ Slipped ({slips.length})</h4>
-          {slips.map(w => (
-            <p key={w.id} style={{ marginTop: '.5rem' }}>
-              <button className="linklike" onClick={() => onOpenCase(w.id)}>{w.title}</button>
-              {' '}— {areaName(w, data)}: <b style={{ color: 'var(--g4)' }}><span className={`rag rag-${w.from}`} /> {RAG_LABEL[w.from]} → <span className={`rag rag-${w.to}`} /> {RAG_LABEL[w.to]}</b>
-            </p>
-          ))}
+          <div style={{ marginTop: '.3rem' }}>
+            {slips.map(w => (
+              <div key={w.id} className="activity-row">
+                <span className="ico">⚠</span>
+                <div>
+                  <button className="linklike" onClick={() => onOpenCase(w.id)}>{w.title}</button>
+                  <span className="muted"> — {areaName(w, data)}</span>
+                  <div className="muted" style={{ marginTop: '.15rem' }}>
+                    <span className={`rag rag-${w.from}`} /> {RAG_LABEL[w.from]} → <span className={`rag rag-${w.to}`} /> {RAG_LABEL[w.to]}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -149,13 +175,21 @@ export default function ActivityTab({ data, onOpenCase }) {
           <p className="muted" style={{ margin: '.35rem 0 .5rem' }}>
             Owned, live or on hold, but no note, status move or re-grade in the last {windowLabel}.
           </p>
-          {stale.map(({ p, days }) => (
-            <p key={p.id} style={{ marginTop: '.4rem' }}>
-              <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
-              {' '}— {areaName(p, data)} · owner <b>{p.owner}</b>
-              {days !== null && <span className="muted"> · {days}d at this stage</span>}
-            </p>
-          ))}
+          <div>
+            {stale.map(({ p, days }) => (
+              <div key={p.id} className="activity-row">
+                <span className="ico">🔇</span>
+                <div>
+                  <button className="linklike" onClick={() => onOpenCase(p.id)}>{p.title}</button>
+                  <span className="muted"> — {areaName(p, data)}</span>
+                  <div className="muted" style={{ marginTop: '.15rem' }}>
+                    owner <b style={{ color: 'var(--ink)' }}>{p.owner}</b>
+                    {days !== null && <> · {days}d at this stage</>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

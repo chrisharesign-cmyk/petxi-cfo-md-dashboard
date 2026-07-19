@@ -169,10 +169,19 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 /* ---- activity tab ---- */
 .exec-summary{font-size:.9rem;margin-bottom:1rem;background:var(--ink);color:#f2f0e8;border-color:var(--ink)}
 .win-card{border-color:#7fb374;background:linear-gradient(180deg,#f3faf1,var(--card) 60%)}
-.win-row{font-size:.9rem}
 .stale-card{border-color:#c98080;background:linear-gradient(180deg,#fbf1f1,var(--card) 60%)}
-.activity-row{display:flex;gap:.8rem;align-items:baseline;padding:.4rem 0;border-bottom:1px solid var(--line-soft);font-size:.86rem}
+.activity-row{display:flex;gap:.7rem;align-items:flex-start;padding:.5rem 0;border-bottom:1px solid var(--line-soft);font-size:.9rem}
 .activity-row:last-child{border-bottom:none}
+.activity-row .ico{flex:none;font-size:1.05rem;line-height:1.4}
+/* compact stat cards — same mono-uppercase eyebrow + bold-figure language
+   as the period header on the SAR screen (.sub-head / .period-q), so the
+   two small summary cards up top read as part of the same design system
+   rather than ad hoc prose headings */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.stat-card{padding:1.1rem 1.4rem}
+.stat-label{display:block;font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:.4rem}
+.stat-value{display:inline-block;font-weight:800;font-size:1.5rem;letter-spacing:-.02em;color:var(--ink)}
+@media (max-width:720px){.stat-grid{grid-template-columns:1fr}}
 
 /* ---- sortable table headers ---- */
 .ptable th.sortable{cursor:pointer;user-select:none}
