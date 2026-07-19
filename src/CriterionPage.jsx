@@ -45,6 +45,9 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
   const improveText = scope === 'unit'
     ? (crit?.solution_by_unit?.[unit_id] || crit?.solution)
     : (crit?.solution_by_function?.[function_id] || crit?.solution);
+  const likelyCauseText = scope === 'unit'
+    ? (crit?.likely_cause_by_unit?.[unit_id] || crit?.likely_cause)
+    : (crit?.likely_cause_by_function?.[function_id] || crit?.likely_cause);
 
   const saveRC = async () => {
     setRcBusy(true);
@@ -84,14 +87,25 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
         </div>
       )}
 
-      {improveText && (
+      {(improveText || likelyCauseText) && (
         <div className="card" style={{ marginTop: '1rem' }}>
           <h4 style={{ margin: 0 }}>Claude's Initial Thoughts on how to Improve</h4>
           <p className="muted" style={{ fontSize: '.78rem', marginTop: '.2rem' }}>
             A starting point, tailored to this {scope === 'unit' ? 'unit' : 'horizontal'} — worth challenging, not
             just following. This applies whatever the current grade; there's always a next step.
           </p>
-          <p style={{ marginTop: '.5rem', whiteSpace: 'pre-wrap' }}>{improveText}</p>
+          {likelyCauseText && (
+            <>
+              <h5 style={{ margin: '.8rem 0 .2rem', fontSize: '.82rem' }}>Likely root cause</h5>
+              <p style={{ margin: 0 }}>{likelyCauseText}</p>
+            </>
+          )}
+          {improveText && (
+            <>
+              <h5 style={{ margin: '.8rem 0 .2rem', fontSize: '.82rem' }}>Ways to improve</h5>
+              <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{improveText}</p>
+            </>
+          )}
         </div>
       )}
 
