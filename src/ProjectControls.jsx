@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supa, REVIEWERS } from './supa';
 import { promoteLive, pauseProject, resumeLive, moveBackLive,
   completeProject, cancelProject, updateProjectDue, rescheduleProject } from './data';
-import { PACE_LABEL, PACE_DESC, friendlyProjectError, fmtDate, autoTarget, upcomingQuarters, quarterLabel, RAG_LABEL } from './util';
+import { PACE_LABEL, PACE_DESC, friendlyProjectError, fmtDate, autoTarget, upcomingQuarters, quarterLabel, RAG_LABEL, officialCurrentGrade } from './util';
 import { usePrompt } from './Dialogs';
 
 // Owner isn't limited to the two reviewers — anyone (Josh, ops staff, etc.)
@@ -224,11 +224,7 @@ export function StatusMenu({ project, data, onSaved }) {
   const complete = async () => {
     const what = await askText('What changed? Required to mark this complete.', { confirmLabel: 'Complete' });
     if (!what) return;
-    const rows = project.scope === 'unit'
-      ? data.scores.filter(s => s.unit_id === project.unit_id && s.criterion_id === project.criterion_id)
-      : data.oscores.filter(s => s.function_id === project.function_id && s.criterion_id === project.criterion_id);
-    const grade = rows.length ? Math.max(...rows.map(r => r.score)) : null;
-    run(completeProject, project.id, { what_changed: what, grade_at_completion: grade });
+    run(completeProject, project.id, { what_changed: what, grade_at_completion: officialCurrentGrade(project, data) });
   };
   const cancel = async () => {
     const reason = await askText('Reason for cancelling — kept on record, not deleted.', { confirmLabel: 'Cancel project', danger: true });

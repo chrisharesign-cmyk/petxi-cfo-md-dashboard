@@ -4,21 +4,12 @@ import { loadNotes, addNote, editNote, promoteLive, pauseProject, resumeLive,
   moveBackLive, completeProject, cancelProject, loadMeetingsForProject,
   archiveProject, unarchiveProject, markProjectDiscussed } from './data';
 import { PACE_LABEL, PACE_DESC, statusBadge, fmtDate, describeChange,
-  friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, RAG_LABEL } from './util';
+  friendlyProjectError, daysInStage, isOverStageLimit, buildProjectPrompt, RAG_LABEL, officialCurrentGrade } from './util';
 import EditableText from './EditableText';
 import { OwnerEditor, ScheduleEditor, AreaEditor, RagEditor } from './ProjectControls';
 import { usePrompt, useConfirm } from './Dialogs';
 import ProjectDocuments from './Documents';
 import ProjectLinks from './ProjectLinks';
-
-// The official SAR score right now — distinct from project.progress_rag,
-// which is the informal on-track/at-risk read between formal periods.
-function officialCurrentGrade(p, data) {
-  const rows = p.scope === 'unit'
-    ? data.scores.filter(s => s.unit_id === p.unit_id && s.criterion_id === p.criterion_id)
-    : data.oscores.filter(s => s.function_id === p.function_id && s.criterion_id === p.criterion_id);
-  return rows.length ? Math.max(...rows.map(r => r.score)) : null;
-}
 
 // Anything leaving To discuss gets a date (from pace) and an owner, in the
 // same step — no more "queue for later, decide details another day".

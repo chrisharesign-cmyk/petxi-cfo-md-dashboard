@@ -10,6 +10,7 @@ import MeetingsTab from './Meetings';
 import AreaPage from './AreaPage';
 import CriterionPage from './CriterionPage';
 import CaseFile from './CaseFile';
+import AgreeScores from './AgreeScores';
 
 function useGate() {
   const [me, setMe] = useState(() => localStorage.getItem('petxi-me') || '');
@@ -52,6 +53,7 @@ function Dashboard({ me, onLeave }) {
   const [areaView, setAreaView] = useState(null);
   const [criterionView, setCriterionView] = useState(null);
   const [caseFileId, setCaseFileId] = useState(null);
+  const [showAgreed, setShowAgreed] = useState(false);
   const openCriterion = (c) => { setCriterionView(c); setAreaView(null); };
   const openArea = (a) => { setAreaView(a); setCriterionView(null); };
   const myKey = REVIEWERS.find(r => r.name === me)?.key;
@@ -144,6 +146,11 @@ function Dashboard({ me, onLeave }) {
           <div className="key-item"><span className="key-dot s3">3</span> Escalate — senior intervention this week</div>
           <div className="key-item"><span className="key-dot s4">4</span> Critical — in ICU, run under direct control</div>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '.35rem', fontSize: '.78rem', cursor: 'pointer' }}
+              title="Show the agreed final score in place of Chris's and Fleur's individual reads, wherever one's been set">
+              <input type="checkbox" checked={showAgreed} onChange={e => setShowAgreed(e.target.checked)} />
+              Show agreed scores
+            </label>
             {!canEdit ? (
               <span className="lockchip">🔒 Locked by {data.period.locked_by} · {new Date(data.period.locked_at).toLocaleDateString('en-GB')}</span>
             ) : periodId === data.periods.find(p => !p.locked_at)?.id ? (
@@ -153,7 +160,7 @@ function Dashboard({ me, onLeave }) {
         </div>
       </header>
       <nav className="tabs">
-        {[['qip', 'SAR'], ['projects', 'Excellence Projects'], ['meetings', 'Meetings'], ['activity', 'This Week']].map(([k, l]) => (
+        {[['qip', 'SAR'], ['agree', 'Agree Scores'], ['projects', 'Excellence Projects'], ['meetings', 'Meetings'], ['activity', 'This Week']].map(([k, l]) => (
           <button key={k} className={tab === k ? 'active' : ''} onClick={() => { setTab(k); setAreaView(null); setCriterionView(null); setCaseFileId(null); }}>{l}</button>
         ))}
       </nav>
@@ -171,8 +178,9 @@ function Dashboard({ me, onLeave }) {
           : areaView
           ? <AreaPage scope={areaView.scope} id={areaView.id} data={data} onBack={() => setAreaView(null)} onOpenCase={setCaseFileId} onOpenCriterion={openCriterion} onRefresh={refresh} />
           : <>
-            {tab === 'qip' && <Qip data={data} me={me} myKey={myKey} onScore={score} canEdit={canEdit}
+            {tab === 'qip' && <Qip data={data} me={me} myKey={myKey} onScore={score} canEdit={canEdit} showAgreed={showAgreed}
               liveCountByCell={liveCountByCell} onOpenArea={openArea} onOpenCriterion={openCriterion} onOpenCase={setCaseFileId} />}
+            {tab === 'agree' && <AgreeScores data={data} me={me} canEdit={canEdit} onRefresh={refresh} />}
             {tab === 'projects' && <ProjectsTab data={data} me={me} onRefresh={refresh} onOpenCase={setCaseFileId} />}
             {tab === 'meetings' && <MeetingsTab data={data} me={me} onOpenCase={setCaseFileId} onOpenCriterion={openCriterion} onRefresh={refresh} />}
             {tab === 'activity' && <ActivityTab data={data} onOpenCase={setCaseFileId} />}

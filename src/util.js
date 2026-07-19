@@ -194,6 +194,33 @@ export function describeChange(row) {
   return changed.map(k => `${k}: "${before[k] ?? '—'}" → "${after[k] ?? '—'}"`).join('; ');
 }
 
+// The agreed final score for a cell, once Chris and Fleur have reconciled
+// their individual reads on the Agreement tab — null until then. Looks in
+// data.finalScores, which loadAll already scopes to the current period.
+export function finalScoreFor(data, { scope, unit_id, function_id, criterion_id }) {
+  const row = (data.finalScores || []).find(f =>
+    f.scope === scope && (f.unit_id || '') === (unit_id || '') &&
+    (f.function_id || '') === (function_id || '') && f.criterion_id === criterion_id);
+  return row?.score ?? null;
+}
+
+// The official current SAR grade for a project's criterion: the agreed
+// final score if Chris and Fleur have reconciled it, otherwise the worst
+// (highest-numbered) of whichever individual reviewer scores exist — the
+// same "nothing slips through unnoticed" logic as before reconciliation
+// existed. Distinct from project.progress_rag, which is the informal
+// on-track/at-risk read between formal SAR periods.
+export function officialCurrentGrade(p, data) {
+  const agreed = finalScoreFor(data, {
+    scope: p.scope, unit_id: p.unit_id, function_id: p.function_id, criterion_id: p.criterion_id,
+  });
+  if (agreed) return agreed;
+  const rows = p.scope === 'unit'
+    ? data.scores.filter(s => s.unit_id === p.unit_id && s.criterion_id === p.criterion_id)
+    : data.oscores.filter(s => s.function_id === p.function_id && s.criterion_id === p.criterion_id);
+  return rows.length ? Math.max(...rows.map(r => r.score)) : null;
+}
+
 // progress_rag is an informal on-track/at-risk read a project owner can set
 // any time — separate from the locked SAR score, which only moves at the
 // start of the next assessment period. R/A/G, no in-between.

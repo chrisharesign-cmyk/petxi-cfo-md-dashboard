@@ -18,7 +18,7 @@ export async function loadPeriods() {
 
 // Load the whole matrix structure + one period's scores/projects in one go.
 export async function loadAll(periodId) {
-  const [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods, projectLinks, contentFlags] = await Promise.all([
+  const [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods, projectLinks, contentFlags, finalScores] = await Promise.all([
     supa.from('units').select('*').order('sort'),
     supa.from('criteria').select('*').order('sort'),
     supa.from('org_functions').select('*').order('sort'),
@@ -29,8 +29,9 @@ export async function loadAll(periodId) {
     supa.from('sar_periods').select('*').order('starts'),
     supa.from('project_links').select('*').eq('confirmed', true),
     supa.from('content_flags').select('*'),
+    supa.from('final_scores').select('*').eq('period_id', periodId),
   ]);
-  const err = [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods, projectLinks, contentFlags].find(r => r.error);
+  const err = [units, criteria, ofuncs, ocrit, scores, oscores, projects, periods, projectLinks, contentFlags, finalScores].find(r => r.error);
   if (err) throw err.error;
   const period = periods.data.find(p => p.id === periodId);
   return {
@@ -40,6 +41,7 @@ export async function loadAll(periodId) {
     projects: projects.data, periods: periods.data, period,
     projectLinks: projectLinks.data,
     contentFlags: contentFlags.data,
+    finalScores: finalScores.data,
   };
 }
 
@@ -95,6 +97,22 @@ export async function setOrgScore({ function_id, criterion_id, score, reviewer, 
 export async function clearOrgScore({ function_id, criterion_id, reviewer, period_id, week = weekStart() }) {
   const { error } = await supa.from('org_scores').delete()
     .match({ function_id, criterion_id, week_start: week, period_id, reviewer });
+  if (error) throw error;
+}
+
+// ---- agreed final score: once Chris and Fleur have graded independently,
+// this is where they record what they've actually agreed the grade is.
+// Separate from scores/org_scores (each reviewer's own read) so reconciling
+// never overwrites either individual score — it's a third, joint number.
+export async function setFinalScore({ scope, unit_id, function_id, criterion_id, score, period_id, decided_by }) {
+  const { error } = await supa.from('final_scores')
+    .upsert({ scope, unit_id: unit_id || '', function_id: function_id || '', criterion_id, period_id, score, decided_by, updated_at: new Date().toISOString() },
+            { onConflict: 'scope,unit_id,function_id,criterion_id,period_id' });
+  if (error) throw error;
+}
+export async function clearFinalScore({ scope, unit_id, function_id, criterion_id, period_id }) {
+  const { error } = await supa.from('final_scores').delete()
+    .match({ scope, unit_id: unit_id || '', function_id: function_id || '', criterion_id, period_id });
   if (error) throw error;
 }
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { REVIEWERS } from './supa';
 import { setScore, clearScore, setOrgScore, clearOrgScore } from './data';
 import { BANDS, CRIT_BY_UNIT, meanGrade, countdown } from './matrixdata';
+import { finalScoreFor } from './util';
 
 // Row/column labels are short jargon (eg. "Term pipeline coverage") — hover
 // shows the "on target" descriptor so reviewers know what's being measured.
@@ -53,7 +54,7 @@ function DotLegend() {
   );
 }
 
-export default function Qip({ data, me, myKey, onScore, canEdit, liveCountByCell, onOpenArea, onOpenCriterion, onOpenCase }) {
+export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liveCountByCell, onOpenArea, onOpenCriterion, onOpenCase }) {
   const { units, criteria, ofuncs, ocrit, scores, oscores, period } = data;
   const critById = Object.fromEntries(criteria.map(c => [c.id, c]));
 
@@ -64,10 +65,18 @@ export default function Qip({ data, me, myKey, onScore, canEdit, liveCountByCell
   };
   const descFor = (c, uid) => (c.descriptors_by_unit?.[uid]) || c.descriptors;
 
+  // Once agreed, a criterion's grade counts twice toward the mean (same
+  // weight as two individual reviewer scores would have) rather than
+  // silently dropping to one data point just because it's been reconciled.
+  const meanContribution = (cid, uid, vals) => {
+    const agreed = finalScoreFor(data, { scope: 'unit', unit_id: uid, function_id: null, criterion_id: cid });
+    if (agreed) { vals.push(agreed, agreed); return; }
+    REVIEWERS.forEach(r => { const { g } = scoreOf(cid, uid, r.key); if (g) vals.push(g); });
+  };
   const unitMean = uid => {
     const vals = [];
-    criteria.filter(c => !c.unit_id).forEach(c => REVIEWERS.forEach(r => { const { g } = scoreOf(c.id, uid, r.key); if (g) vals.push(g); }));
-    (CRIT_BY_UNIT[uid] || []).forEach(cid => REVIEWERS.forEach(r => { const { g } = scoreOf(cid, uid, r.key); if (g) vals.push(g); }));
+    criteria.filter(c => !c.unit_id).forEach(c => meanContribution(c.id, uid, vals));
+    (CRIT_BY_UNIT[uid] || []).forEach(cid => meanContribution(cid, uid, vals));
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
   };
 
@@ -86,6 +95,10 @@ export default function Qip({ data, me, myKey, onScore, canEdit, liveCountByCell
   };
 
   const Chip = ({ c, uid, rk }) => {
+    const agreed = showAgreed ? finalScoreFor(data, { scope: 'unit', unit_id: uid, function_id: null, criterion_id: c.id }) : null;
+    if (agreed) {
+      return <button className={`chip s${agreed}`} disabled title={`Agreed final score: ${agreed}`}>{agreed}</button>;
+    }
     const { g, snap } = scoreOf(c.id, uid, rk);
     const mine = rk === myKey;
     const clickable = canEdit && mine;
@@ -160,7 +173,7 @@ export default function Qip({ data, me, myKey, onScore, canEdit, liveCountByCell
           : <>Locked — {period?.label}. Grades are read-only; the wording shown on hover is what was judged against at lock time.</>}
       </p>
 
-      <OrgMatrix data={data} me={me} myKey={myKey} onScore={onScore} canEdit={canEdit}
+      <OrgMatrix data={data} me={me} myKey={myKey} onScore={onScore} canEdit={canEdit} showAgreed={showAgreed}
         liveCountByCell={liveCountByCell} onOpenArea={onOpenArea} onOpenCriterion={onOpenCriterion} onOpenCase={onOpenCase} />
 
       {pick && (
@@ -208,14 +221,19 @@ function FragCells({ c, u, Chip, CircleCell }) {
   </>;
 }
 
-function OrgMatrix({ data, me, myKey, onScore, canEdit, liveCountByCell, onOpenArea, onOpenCriterion, onOpenCase }) {
+function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, liveCountByCell, onOpenArea, onOpenCriterion, onOpenCase }) {
   const { ofuncs, ocrit, oscores } = data;
   const scoreOf = (fid, cid, rk) => {
     const rev = REVIEWERS.find(r => r.key === rk).name;
     return oscores.find(s => s.function_id === fid && s.criterion_id === cid && s.reviewer === rev)?.score || 0;
   };
   const rowMean = fid => {
-    const vals = []; ocrit.forEach(c => REVIEWERS.forEach(r => { const g = scoreOf(fid, c.id, r.key); if (g) vals.push(g); }));
+    const vals = [];
+    ocrit.forEach(c => {
+      const agreed = finalScoreFor(data, { scope: 'org', unit_id: null, function_id: fid, criterion_id: c.id });
+      if (agreed) { vals.push(agreed, agreed); return; }
+      REVIEWERS.forEach(r => { const g = scoreOf(fid, c.id, r.key); if (g) vals.push(g); });
+    });
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
   };
   const [pick, setPick] = useState(null);
@@ -232,6 +250,10 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, liveCountByCell, onOpenA
     setPick(null);
   };
   const Chip = ({ f, c, rk }) => {
+    const agreed = showAgreed ? finalScoreFor(data, { scope: 'org', unit_id: null, function_id: f.id, criterion_id: c.id }) : null;
+    if (agreed) {
+      return <button className={`chip s${agreed}`} disabled title={`Agreed final score: ${agreed}`}>{agreed}</button>;
+    }
     const g = scoreOf(f.id, c.id, rk), mine = rk === myKey, clickable = canEdit && mine;
     return (
       <button className={`chip ${g ? ('s' + g) : 'empty'} ${clickable ? '' : 'readonly'}`}
