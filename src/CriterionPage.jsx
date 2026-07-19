@@ -39,6 +39,9 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
   const projects = data.projects.filter(p => !p.archived_at && p.scope === scope && p.criterion_id === criterion_id &&
     (scope === 'unit' ? p.unit_id === unit_id : p.function_id === function_id));
   const liveCount = projects.filter(p => p.status === 'live').length;
+  const excellenceText = scope === 'unit'
+    ? (crit?.descriptors_by_unit?.[unit_id] || crit?.descriptors)?.[0]
+    : crit?.descriptors?.[0];
 
   const saveRC = async () => {
     setRcBusy(true);
@@ -72,6 +75,12 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
         </div>
       </div>
 
+      {excellenceText && (
+        <div className="card legend-card" style={{ marginTop: '1rem' }}>
+          <b>What excellence looks like:</b> {excellenceText}
+        </div>
+      )}
+
       <div className="card" style={{ marginTop: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h4 style={{ margin: 0 }}>Root cause</h4>
@@ -102,7 +111,7 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
         </div>
         {showAdd && (
           <AddCriterionProject scope={scope} unit_id={unit_id} function_id={function_id} criterion_id={criterion_id}
-            data={data} onDone={() => { setShowAdd(false); onRefresh(); }} />
+            data={data} excellenceText={excellenceText} onDone={() => { setShowAdd(false); onRefresh(); }} />
         )}
         {!projects.length && !showAdd && <p className="muted" style={{ marginTop: '.5rem' }}>No projects yet — the solutions to whatever's in root cause above.</p>}
         {projects.map(p => {
@@ -132,7 +141,7 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
 // Goes straight to live — no more discuss/potential holding stage. Owner
 // and pace (and so a date) are both required at creation, same rule as
 // everywhere else a project can start.
-function AddCriterionProject({ scope, unit_id, function_id, criterion_id, data, onDone }) {
+function AddCriterionProject({ scope, unit_id, function_id, criterion_id, data, excellenceText, onDone }) {
   const [title, setTitle] = useState('');
   const [pace, setPace] = useState('rapid');
   const [owner, setOwner] = useState('');
@@ -164,6 +173,11 @@ function AddCriterionProject({ scope, unit_id, function_id, criterion_id, data, 
 
   return (
     <form className="card" onSubmit={submit} style={{ marginTop: '.6rem', background: 'var(--paper)' }}>
+      {excellenceText && (
+        <p className="muted" style={{ fontSize: '.78rem', marginBottom: '.6rem' }}>
+          <b>Aiming for:</b> {excellenceText}
+        </p>
+      )}
       <input className="formctl" placeholder="Project title" value={title} onChange={e => setTitle(e.target.value)}
         style={{ width: '100%', marginBottom: '.5rem' }} required autoFocus />
       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.5rem' }}>
