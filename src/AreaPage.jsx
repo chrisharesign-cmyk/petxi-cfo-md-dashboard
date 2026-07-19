@@ -5,7 +5,7 @@ import { fmtDate, buildAreaPrompt } from './util';
 import EditableText from './EditableText';
 import Sparkline from './Sparkline';
 
-export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCriterion }) {
+export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCriterion, onRefresh }) {
   const [trajectory, setTrajectory] = useState([]);
   const [copied, setCopied] = useState(false);
   useEffect(() => { periodMeans(scope, id).then(setTrajectory).catch(() => {}); }, [scope, id]);
@@ -35,7 +35,7 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCr
       <button className="linklike" onClick={onBack}>← Back to QIP</button>
       <div className="panel-h" style={{ marginTop: '.6rem' }}>
         <span className="bar" style={{ background: 'var(--g2)' }} />
-        <EditableText table={table} id={id} field="name" value={area?.name} className="areaTitle" />
+        <EditableText table={table} id={id} field="name" value={area?.name} className="areaTitle" onSaved={onRefresh} />
         <span style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
           <button className="btn" onClick={copyAreaPrompt} title="Copies a prompt covering everything at 3 or 4 in this area — paste into claude.ai for a holistic plan">
             {copied ? 'Copied ✓' : 'Explore with Claude'}
@@ -55,7 +55,7 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCr
               return (
                 <tr key={c.id}>
                   <td>
-                    <EditableText table={critTable} id={c.id} field="name" value={c.name} />
+                    <EditableText table={critTable} id={c.id} field="name" value={c.name} onSaved={onRefresh} />
                     {onOpenCriterion && (
                       <button className="linklike" style={{ marginLeft: '.4rem', fontSize: '.72rem' }}
                         onClick={() => onOpenCriterion(scope === 'unit'
@@ -69,7 +69,7 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCr
                     <td key={reviewer.key}>{row ? <span className={`chip s${row.score}`} style={{ position: 'static' }}>{row.score}</span> : '—'}</td>
                   ))}
                   <td className="muted" style={{ fontSize: '.76rem' }}>
-                    {snap || <EditableText table={critTable} id={c.id} field="solution" value={c.solution} placeholder="add suggested solution" />}
+                    {snap || <EditableText table={critTable} id={c.id} field="solution" value={c.solution} placeholder="add suggested solution" onSaved={onRefresh} />}
                   </td>
                 </tr>
               );

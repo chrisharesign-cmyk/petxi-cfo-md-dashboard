@@ -167,7 +167,7 @@ function Dashboard({ me, onLeave }) {
         {criterionView
           ? <CriterionPage {...criterionView} data={data} me={me} onBack={() => setCriterionView(null)} onOpenCase={setCaseFileId} onRefresh={refresh} />
           : areaView
-          ? <AreaPage scope={areaView.scope} id={areaView.id} data={data} onBack={() => setAreaView(null)} onOpenCase={setCaseFileId} onOpenCriterion={openCriterion} />
+          ? <AreaPage scope={areaView.scope} id={areaView.id} data={data} onBack={() => setAreaView(null)} onOpenCase={setCaseFileId} onOpenCriterion={openCriterion} onRefresh={refresh} />
           : <>
             {tab === 'qip' && <Qip data={data} me={me} myKey={myKey} onScore={score} canEdit={canEdit}
               liveCountByCell={liveCountByCell} onOpenArea={openArea} onOpenCriterion={openCriterion} onOpenCase={setCaseFileId} />}

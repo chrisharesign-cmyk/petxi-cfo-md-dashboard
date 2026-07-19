@@ -7,15 +7,17 @@ export default function EditableText({ table, id, field, value, onSaved, placeho
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || '');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const save = async () => {
-    setBusy(true);
+    setBusy(true); setError('');
     try {
-      const { error } = await supa.from(table).update({ [field]: draft }).eq('id', id);
-      if (error) throw error;
+      const { error: err } = await supa.from(table).update({ [field]: draft }).eq('id', id);
+      if (err) throw err;
       setEditing(false);
       onSaved?.(draft);
-    } finally { setBusy(false); }
+    } catch (e) { setError(e.message || String(e)); }
+    finally { setBusy(false); }
   };
 
   const Tag = multiline ? 'div' : 'span';
@@ -36,6 +38,7 @@ export default function EditableText({ table, id, field, value, onSaved, placeho
             onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }} />}
       <button disabled={busy} onClick={save}>Save</button>
       <button type="button" onClick={() => setEditing(false)}>Cancel</button>
+      {error && <span className="muted" style={{ color: 'var(--g4)', display: 'block', width: '100%' }}>{error}</span>}
     </Tag>
   );
 }
