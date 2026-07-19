@@ -269,27 +269,32 @@ export function activityRowInfo(row, data) {
   }
   if (row.table_name === 'projects') {
     if (row.action === 'INSERT') {
+      const p = project(row.new_row?.id);
       return {
         icon: '➕', status: 'New project',
-        projectId: row.new_row?.id, title: row.new_row?.title,
-        criteria: criterionName(project(row.new_row?.id) || row.new_row), rag: row.new_row?.progress_rag,
+        projectId: row.new_row?.id, title: p?.title || row.new_row?.title,
+        criteria: criterionName(p || row.new_row), rag: row.new_row?.progress_rag,
       };
     }
     if (row.action !== 'UPDATE') return null;
     const before = row.old_row || {}, after = row.new_row || {};
     const p = project(after.id);
+    // Always the current title, not whatever the snapshot happened to say
+    // at that moment — a project renamed since shouldn't keep resurrecting
+    // its old name every time an old activity row is displayed.
+    const title = p?.title || after.title;
     if (before.progress_rag !== after.progress_rag && after.progress_rag != null) {
       const improved = before.progress_rag && RAG_RANK[after.progress_rag] < RAG_RANK[before.progress_rag];
       const icon = !before.progress_rag ? '🚦' : improved ? '🎉' : '⚠';
       const status = before.progress_rag
         ? `RAG: ${RAG_LABEL[before.progress_rag]} → ${RAG_LABEL[after.progress_rag]}`
         : `RAG set: ${RAG_LABEL[after.progress_rag]}`;
-      return { icon, status, projectId: after.id, title: after.title, criteria: criterionName(p || after), rag: after.progress_rag };
+      return { icon, status, projectId: after.id, title, criteria: criterionName(p || after), rag: after.progress_rag };
     }
     if (before.status !== after.status) {
       return {
         icon: '↪', status: `Moved to ${STATUS_LABEL[after.status] || after.status}${after.pace ? ` (${PACE_LABEL[after.pace]})` : ''}`,
-        projectId: after.id, title: after.title, criteria: criterionName(p || after), rag: after.progress_rag ?? p?.progress_rag,
+        projectId: after.id, title, criteria: criterionName(p || after), rag: after.progress_rag ?? p?.progress_rag,
       };
     }
     return null;
