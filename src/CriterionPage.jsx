@@ -166,28 +166,31 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
       </div>
 
       <div className="card thoughts-card" style={{ marginTop: '1rem' }}>
+        <h4 className="crit-card-h">Claude's root cause analysis{currentGrade ? ` — grade ${currentGrade}` : ''}</h4>
+        <p className="thoughts-sub">
+          A starting analysis of why this criterion is likely scoring the way it does — distinct from "Your
+          notes" above (your own read) and separate from ways to improve below, since diagnosing the cause and
+          proposing the fix are different jobs. {currentGrade ? 'Tracks the currently graded score — change the grade, this changes with it.' : ''}
+        </p>
+        <EditableCriterionField table={table} id={criterion_id} column={causeCol} value={likelyCauseText}
+          buildNewValue={buildCauseValue(gradeIdx ?? 0)} onSaved={onRefresh} placeholder="— click to add —" />
+      </div>
+
+      <div className="card thoughts-card" style={{ marginTop: '1rem' }}>
         <h4 className="crit-card-h">Claude's initial thoughts on how to improve</h4>
         <p className="thoughts-sub">
           A starting point for this {scope === 'unit' ? 'unit' : 'horizontal'} — worth challenging, not just
-          following, and fully editable below. {currentGrade ? 'Tracks the currently graded score.' : "Applies whatever the current grade; there's always a next step."}
+          following, and fully editable below.
         </p>
-        <div className="thoughts-sec">
-          <div className="thoughts-label"><span className="dot" />Why this is probably happening{currentGrade ? ` (at grade ${currentGrade})` : ''}</div>
-          <EditableCriterionField table={table} id={criterion_id} column={causeCol} value={likelyCauseText}
-            buildNewValue={buildCauseValue(gradeIdx ?? 0)} onSaved={onRefresh} placeholder="— click to add —" />
-        </div>
-        <div className="thoughts-sec">
-          <div className="thoughts-label"><span className="dot" />What could help</div>
-          <EditableCriterionField table={table} id={criterion_id} column={solCol} value={improveText}
-            buildNewValue={buildSolutionValue} onSaved={onRefresh} placeholder="— click to add ideas, one per line —"
-            renderValue={v => (
-              <ul className="thoughts-list">
-                {v.split('\n').map(line => line.replace(/^[\s-]+/, '').trim()).filter(Boolean).map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
-            )} />
-        </div>
+        <EditableCriterionField table={table} id={criterion_id} column={solCol} value={improveText}
+          buildNewValue={buildSolutionValue} onSaved={onRefresh} placeholder="— click to add ideas, one per line —"
+          renderValue={v => (
+            <ul className="thoughts-list">
+              {v.split('\n').map(line => line.replace(/^[\s-]+/, '').trim()).filter(Boolean).map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
+            </ul>
+          )} />
       </div>
 
       <div className="card" style={{ marginTop: '1rem' }}>
