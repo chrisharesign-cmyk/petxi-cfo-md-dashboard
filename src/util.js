@@ -232,13 +232,16 @@ const RAG_RANK = { G: 0, A: 1, R: 2 }; // 0 = best
 // improved-this-window vs worsened-this-window. A first-time set (no prior
 // value) isn't a movement, so it's excluded — "went from nothing to Green"
 // isn't a win, it's just someone finally rating it.
-export function ragMovementsFromRows(rows) {
+export function ragMovementsFromRows(rows, data) {
   const wins = [], slips = [];
   rows.forEach(row => {
     if (row.table_name !== 'projects' || row.action !== 'UPDATE') return;
     const before = row.old_row || {}, after = row.new_row || {};
     if (!after.progress_rag || !before.progress_rag || after.progress_rag === before.progress_rag) return;
-    const entry = { id: after.id, title: after.title, scope: after.scope, unit_id: after.unit_id, function_id: after.function_id, from: before.progress_rag, to: after.progress_rag };
+    // Live title, not the audit-log snapshot — a project renamed since
+    // shouldn't keep resurrecting its old name here either.
+    const title = data?.projects.find(p => p.id === after.id)?.title || after.title;
+    const entry = { id: after.id, title, scope: after.scope, unit_id: after.unit_id, function_id: after.function_id, from: before.progress_rag, to: after.progress_rag };
     (RAG_RANK[after.progress_rag] < RAG_RANK[before.progress_rag] ? wins : slips).push(entry);
   });
   return { wins, slips };
@@ -321,7 +324,7 @@ export function liveActivitySummary(data, rows) {
     if (row.table_name === 'project_notes' && row.new_row?.project_id) touchedIds.add(Number(row.new_row.project_id));
     if (row.table_name === 'projects' && row.record_pk) touchedIds.add(Number(row.record_pk));
   });
-  const { slips } = ragMovementsFromRows(rows);
+  const { slips } = ragMovementsFromRows(rows, data);
   const stalledIds = new Set(slips.filter(s => liveIds.has(s.id)).map(s => s.id));
   const movedIds = new Set([...touchedIds].filter(id => liveIds.has(id) && !stalledIds.has(id)));
   return {

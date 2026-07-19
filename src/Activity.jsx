@@ -85,7 +85,7 @@ export default function ActivityTab({ data, onOpenCase }) {
   const [err, setErr] = useState('');
   useEffect(() => { setRows(null); loadRecentActivity(days).then(setRows).catch(e => setErr(e.message)); }, [days]);
 
-  const { wins, slips } = ragMovementsFromRows(rows || []);
+  const { wins, slips } = ragMovementsFromRows(rows || [], data);
 
   const feed = (rows || [])
     .map(r => ({ row: r, d: activityRowInfo(r, data) }))
