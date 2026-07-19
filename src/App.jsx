@@ -164,7 +164,9 @@ function Dashboard({ me, onLeave }) {
             <button onClick={startNextPeriod}>Start {nextPeriod(data.period).label}</button>
           </div>
         )}
-        {criterionView
+        {caseFileId
+          ? <CaseFile projectId={caseFileId} me={me} data={data} onBack={() => setCaseFileId(null)} onRefresh={refresh} />
+          : criterionView
           ? <CriterionPage {...criterionView} data={data} me={me} onBack={() => setCriterionView(null)} onOpenCase={setCaseFileId} onRefresh={refresh} />
           : areaView
           ? <AreaPage scope={areaView.scope} id={areaView.id} data={data} onBack={() => setAreaView(null)} onOpenCase={setCaseFileId} onOpenCriterion={openCriterion} onRefresh={refresh} />
@@ -176,7 +178,6 @@ function Dashboard({ me, onLeave }) {
             {tab === 'activity' && <ActivityTab data={data} onOpenCase={setCaseFileId} />}
           </>}
       </div>
-      {caseFileId && <CaseFile projectId={caseFileId} me={me} data={data} onClose={() => setCaseFileId(null)} onRefresh={refresh} />}
       {lockDialog && <LockDialog state={lockDialog} data={data} onConfirm={doLock} onClose={() => setLockDialog(null)} onResolve={refresh} />}
     </>
   );

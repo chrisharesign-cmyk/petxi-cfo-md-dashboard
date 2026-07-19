@@ -41,7 +41,7 @@ function AgreePace({ project, data, act }) {
   );
 }
 
-export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
+export default function CaseFile({ projectId, me, data, onBack, onRefresh }) {
   const [notes, setNotes] = useState([]);
   const [audit, setAudit] = useState([]);
   const [meetings, setMeetings] = useState([]);
@@ -69,12 +69,12 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   useEffect(() => { load(); }, [projectId]);
 
   if (!project) return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <button className="modalclose" onClick={onClose}>×</button>
-        <p>Couldn't find that project — it may have just been refreshed. Close and try again.</p>
+    <>
+      <button className="linklike" onClick={onBack}>← Back</button>
+      <div className="card" style={{ marginTop: '1rem' }}>
+        <p>Couldn't find that project — it may have just been refreshed. Go back and try again.</p>
       </div>
-    </div>
+    </>
   );
 
   // A note's edit history is a chain of rows linked by replaces_note_id.
@@ -141,19 +141,22 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal casefile" onClick={e => e.stopPropagation()}>
-        <button className="modalclose" onClick={onClose}>×</button>
-        <h3><EditableText table="projects" id={project.id} field="title" value={project.title} onSaved={onRefresh} /></h3>
+    <>
+      <button className="linklike" onClick={onBack}>← Back</button>
+      <div className="panel-h" style={{ marginTop: '.6rem' }}>
+        <span className="bar" style={{ background: 'var(--g1)' }} />
+        <EditableText table="projects" id={project.id} field="title" value={project.title} className="areaTitle" onSaved={onRefresh} />
+      </div>
 
-        {project.archived_at && (
-          <div className="card" style={{ borderColor: 'var(--g4)', marginBottom: '.8rem' }}>
-            Archived {new Date(project.archived_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} —
-            hidden by default and not counted as running.{' '}
-            <button className="btn" disabled={busy} onClick={() => act(unarchiveProject, project.id)}>Unarchive</button>
-          </div>
-        )}
+      {project.archived_at && (
+        <div className="card" style={{ borderColor: 'var(--g4)', marginTop: '1rem' }}>
+          Archived {new Date(project.archived_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} —
+          hidden by default and not counted as running.{' '}
+          <button className="btn" disabled={busy} onClick={() => act(unarchiveProject, project.id)}>Unarchive</button>
+        </div>
+      )}
 
+      <div className="card" style={{ marginTop: '1rem' }}>
         <div className="casefile-meta">
           <AreaEditor project={project} data={data} onSaved={onRefresh} />
           <span className="meta-sep">·</span>
@@ -162,7 +165,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
           <span>target <ScheduleEditor project={project} data={data} onSaved={onRefresh} /></span>
         </div>
 
-        <div className="casefile-meta" style={{ marginTop: '.3rem' }}>
+        <div className="casefile-meta" style={{ marginTop: '.5rem' }}>
           <span className={`st ${badge.cls}`}>{badge.label}</span>
           {days !== null && !['completed', 'cancelled'].includes(project.status) && (
             <span className={overLimit ? 'at-stage-warn' : ''}>
@@ -186,7 +189,7 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
           </>}
         </div>
 
-        <div className="casefile-actions">
+        <div className="casefile-actions" style={{ marginTop: '.8rem' }}>
           {project.status === 'potential' && <AgreePace project={project} data={data} act={act} />}
           {project.status === 'queued' && <AgreePace project={project} data={data} act={act} />}
           {project.status === 'live' && <>
@@ -200,62 +203,61 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
           {!project.discussed_at && <button className="btn" disabled={busy} onClick={() => act(markProjectDiscussed, project.id)}>Mark discussed</button>}
           {!project.archived_at && <button className="btn danger" disabled={busy} onClick={archive}>Archive</button>}
         </div>
-        {actionError && <p className="muted" style={{ color: 'var(--g4)' }}>{actionError}</p>}
-
+        {actionError && <p className="muted" style={{ color: 'var(--g4)', marginTop: '.5rem' }}>{actionError}</p>}
         {project.status === 'completed' && (
-          <p className="muted">Created at {project.grade_at_creation} → completed at {project.grade_at_completion ?? '—'}. {project.what_changed}</p>
+          <p className="muted" style={{ marginTop: '.5rem' }}>Created at {project.grade_at_creation} → completed at {project.grade_at_completion ?? '—'}. {project.what_changed}</p>
         )}
+      </div>
 
-        <div className="plan-box">
-          <h4 style={{ margin: 0 }}>Project Summary</h4>
-          <p className="muted" style={{ fontSize: '.74rem', margin: '.15rem 0 .4rem' }}>
-            What this project is and why — written by whoever assigns it.
-          </p>
-          <EditableText table="projects" id={project.id} field="summary" value={project.summary}
-            placeholder="No summary yet — click to write one" multiline
-            onSaved={onRefresh} />
+      <div className="card thoughts-card" style={{ marginTop: '1rem' }}>
+        <h4 className="crit-card-h">Project Summary</h4>
+        <p className="thoughts-sub">What this project is and why — written by whoever assigns it.</p>
+        <EditableCaseText table="projects" id={project.id} field="summary" value={project.summary}
+          placeholder="No summary yet — click to write one" onSaved={onRefresh} />
+      </div>
+
+      <div className="card thoughts-card" style={{ marginTop: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <h4 className="crit-card-h">Project Plan</h4>
+          <button className="btn" onClick={copyPrompt} title="Copies a ready-made prompt describing this problem — paste it into claude.ai, then paste the answer back in below">
+            {copied ? 'Copied ✓' : 'Copy prompt for Claude'}
+          </button>
         </div>
+        <p className="thoughts-sub">How to actually do it — written by the owner once they've picked it up.</p>
+        <EditableCaseText table="projects" id={project.id} field="suggested_solution" value={project.suggested_solution}
+          placeholder="No plan yet — click to write one" onSaved={onRefresh} />
+      </div>
 
-        <div className="plan-box">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h4 style={{ margin: 0 }}>Project Plan</h4>
-            <button className="btn" onClick={copyPrompt} title="Copies a ready-made prompt describing this problem — paste it into claude.ai, then paste the answer back in below">
-              {copied ? 'Copied ✓' : 'Copy prompt for Claude'}
-            </button>
-          </div>
-          <p className="muted" style={{ fontSize: '.74rem', margin: '.15rem 0 .4rem' }}>
-            How to actually do it — written by the owner once they've picked it up.
-          </p>
-          <EditableText table="projects" id={project.id} field="suggested_solution" value={project.suggested_solution}
-            placeholder="No plan yet — click to write one" multiline
-            onSaved={onRefresh} />
+      {meetings.length > 0 && (
+        <div className="card" style={{ marginTop: '1rem' }}>
+          <h4 className="crit-card-h">Meetings ({meetings.length})</h4>
+          {meetings.map(m => (
+            <div key={m.id} style={{ marginTop: '.5rem' }}>
+              <button className="linklike" onClick={() => setOpenMeetingId(openMeetingId === m.id ? null : m.id)}>
+                {new Date(m.started_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                {m.title ? ` — ${m.title}` : ''}{m.minutes ? ' 📝' : ''}
+              </button>
+              {openMeetingId === m.id && (
+                <p className="muted" style={{ fontSize: '.82rem', marginTop: '.3rem', marginLeft: '1rem' }}>
+                  {m.minutes || 'No minutes added yet — record and paste them in from the Meetings tab.'}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
+      )}
 
-        {meetings.length > 0 && (
-          <div style={{ marginTop: '1rem' }}>
-            <h4>Meetings ({meetings.length})</h4>
-            {meetings.map(m => (
-              <div key={m.id} style={{ marginTop: '.3rem' }}>
-                <button className="linklike" onClick={() => setOpenMeetingId(openMeetingId === m.id ? null : m.id)}>
-                  {new Date(m.started_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  {m.title ? ` — ${m.title}` : ''}{m.minutes ? ' 📝' : ''}
-                </button>
-                {openMeetingId === m.id && (
-                  <p className="muted" style={{ fontSize: '.78rem', marginLeft: '1rem' }}>
-                    {m.minutes || 'No minutes added yet — record and paste them in from the Meetings tab.'}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
+      <div className="card" style={{ marginTop: '1rem' }}>
         <ProjectLinks project={project} me={me} data={data} />
+      </div>
 
+      <div className="card" style={{ marginTop: '1rem' }}>
         <ProjectDocuments projectId={project.id} me={me} />
+      </div>
 
-        <h4 style={{ marginTop: '1rem' }}>Timeline</h4>
-        <div className="feed">
+      <div className="card" style={{ marginTop: '1rem' }}>
+        <h4 className="crit-card-h">Timeline</h4>
+        <div className="feed" style={{ marginTop: '.6rem' }}>
           {feed.map((f, i) => (
             <div key={i} className="feeditem">
               <span className="muted" style={{ fontSize: '.7rem' }}>{new Date(f.at).toLocaleString('en-GB')}</span>
@@ -279,14 +281,55 @@ export default function CaseFile({ projectId, me, data, onClose, onRefresh }) {
           ))}
         </div>
 
-        <p className="muted" style={{ fontSize: '.74rem', marginTop: '.8rem' }}>This is your progress-update log — what's happened with the plan since last time.</p>
-        <form onSubmit={submitNote} style={{ marginTop: '.3rem', display: 'flex', gap: '.4rem' }}>
+        <p className="muted" style={{ fontSize: '.78rem', marginTop: '.8rem' }}>This is your progress-update log — what's happened with the plan since last time.</p>
+        <form onSubmit={submitNote} style={{ marginTop: '.4rem', display: 'flex', gap: '.5rem' }}>
           <input className="formctl" placeholder={`What's happened this week? — ${me}`} value={noteBody} onChange={e => setNoteBody(e.target.value)} style={{ flex: 1 }} />
           <button className="btn primary" disabled={busy}>Add</button>
         </form>
       </div>
       {textDialog}
       {confirmDialog}
+    </>
+  );
+}
+
+// Long-form fields (Summary, Plan) — same click-to-edit pattern as
+// EditableText, but a taller, wider textarea befitting multi-paragraph
+// content instead of the compact inline-field size EditableText assumes.
+function EditableCaseText({ table, id, field, value, placeholder, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const save = async () => {
+    setBusy(true); setError('');
+    try {
+      const { error: err } = await supa.from(table).update({ [field]: draft }).eq('id', id);
+      if (err) throw err;
+      setEditing(false);
+      onSaved?.();
+    } catch (e) { setError(e.message || String(e)); }
+    finally { setBusy(false); }
+  };
+
+  if (!editing) {
+    return (
+      <div className="editable" style={{ whiteSpace: 'pre-wrap' }} onClick={() => { setDraft(value || ''); setEditing(true); }} title="Click to edit">
+        {value || <span className="muted">{placeholder}</span>}
+      </div>
+    );
+  }
+  return (
+    <div>
+      <textarea className="formctl" value={draft} onChange={e => setDraft(e.target.value)} autoFocus rows={12}
+        style={{ width: '100%', fontSize: '.95rem', lineHeight: 1.6 }}
+        onKeyDown={e => { if (e.key === 'Escape') setEditing(false); }} />
+      <div style={{ marginTop: '.5rem', display: 'flex', gap: '.5rem' }}>
+        <button className="btn primary" disabled={busy} onClick={save}>Save</button>
+        <button className="btn" onClick={() => setEditing(false)}>Cancel</button>
+      </div>
+      {error && <p className="muted" style={{ color: 'var(--g4)' }}>{error}</p>}
     </div>
   );
 }
