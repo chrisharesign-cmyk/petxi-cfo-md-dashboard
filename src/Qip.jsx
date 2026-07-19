@@ -44,12 +44,24 @@ function CircleNav({ count, onOpen, label }) {
   );
 }
 
-function DotLegend() {
+// Read-only — the agreed score is set from the Agree Scores tab, not here.
+function AgreedChip({ agreed }) {
+  return (
+    <button className={`chip ${agreed ? 's' + agreed : 'empty'}`} disabled
+      title={agreed ? `Agreed final score: ${agreed}` : 'Not agreed yet — set it on the Agree Scores tab'}>
+      {agreed || '–'}
+    </button>
+  );
+}
+
+function DotLegend({ showAgreed }) {
   return (
     <div className="card legend-card">
-      <b>The square</b> under "Live Projects", between Chris's and Fleur's scores, is always there — it's the
-      number of live projects running against that criterion (or "–" for none). <b>Double-click it</b> to open
-      that criterion's own page: root cause analysis, and every project (solution) against it.
+      <b>The square</b> — always the last column — is the number of live projects running against that criterion
+      (or "–" for none). <b>Double-click it</b> to open that criterion's own page: root cause analysis, and every
+      project (solution) against it. {showAgreed
+        ? <>Chris's and Fleur's individual scores are hidden right now — toggle "Show agreed scores" off to see them again.</>
+        : <>The <b>Agreed</b> column shows the jointly-decided final grade once you've set one on the Agree Scores tab.</>}
     </div>
   );
 }
@@ -57,6 +69,7 @@ function DotLegend() {
 export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liveCountByCell, onOpenArea, onOpenCriterion, onOpenCase }) {
   const { units, criteria, ofuncs, ocrit, scores, oscores, period } = data;
   const critById = Object.fromEntries(criteria.map(c => [c.id, c]));
+  const colsPerGroup = showAgreed ? 2 : 4;
 
   const scoreOf = (cid, uid, rk) => {
     const rev = REVIEWERS.find(r => r.key === rk).name;
@@ -64,12 +77,13 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
     return { g: row?.score || 0, snap: row?.descriptor_snapshot };
   };
   const descFor = (c, uid) => (c.descriptors_by_unit?.[uid]) || c.descriptors;
+  const agreedFor = (cid, uid) => finalScoreFor(data, { scope: 'unit', unit_id: uid, function_id: null, criterion_id: cid });
 
   // Once agreed, a criterion's grade counts twice toward the mean (same
   // weight as two individual reviewer scores would have) rather than
   // silently dropping to one data point just because it's been reconciled.
   const meanContribution = (cid, uid, vals) => {
-    const agreed = finalScoreFor(data, { scope: 'unit', unit_id: uid, function_id: null, criterion_id: cid });
+    const agreed = agreedFor(cid, uid);
     if (agreed) { vals.push(agreed, agreed); return; }
     REVIEWERS.forEach(r => { const { g } = scoreOf(cid, uid, r.key); if (g) vals.push(g); });
   };
@@ -95,10 +109,6 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
   };
 
   const Chip = ({ c, uid, rk }) => {
-    const agreed = showAgreed ? finalScoreFor(data, { scope: 'unit', unit_id: uid, function_id: null, criterion_id: c.id }) : null;
-    if (agreed) {
-      return <button className={`chip s${agreed}`} disabled title={`Agreed final score: ${agreed}`}>{agreed}</button>;
-    }
     const { g, snap } = scoreOf(c.id, uid, rk);
     const mine = rk === myKey;
     const clickable = canEdit && mine;
@@ -116,14 +126,29 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
       onOpen={() => onOpenCriterion({ scope: 'unit', unit_id: uid, function_id: null, criterion_id: c.id })} />
   );
 
+  // Every visible cell for one unit's column group, in fixed order:
+  // CH, FS (both dropped when showAgreed), Agreed, Live Projects square.
+  const GroupCells = ({ c, uid }) => (
+    <>
+      {!showAgreed && <td><Chip c={c} uid={uid} rk="ch" /></td>}
+      {!showAgreed && <td><Chip c={c} uid={uid} rk="fs" /></td>}
+      <td><AgreedChip agreed={agreedFor(c.id, uid)} /></td>
+      <td className="circle-cell usep"><CircleCell c={c} uid={uid} /></td>
+    </>
+  );
+
   return (
     <>
-      <DotLegend />
+      <DotLegend showAgreed={showAgreed} />
       <div className="board">
         <table className="matrix">
           <colgroup>
             <col style={{ width: 220 }} />
-            {units.flatMap(u => [<col key={u.id + '-ch'} />, <col key={u.id + '-mid'} style={{ width: 60 }} />, <col key={u.id + '-fs'} />])}
+            {units.flatMap(u => [
+              ...(!showAgreed ? [<col key={u.id + '-ch'} />, <col key={u.id + '-fs'} />] : []),
+              <col key={u.id + '-agreed'} />,
+              <col key={u.id + '-sq'} style={{ width: 60 }} />,
+            ])}
           </colgroup>
           <thead>
             <tr>
@@ -134,34 +159,37 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
               </th>
               {units.map(u => {
                 const m = unitMean(u.id);
-                return <th key={u.id} colSpan={3} className="usep">
+                return <th key={u.id} colSpan={colsPerGroup} className="usep">
                   <button className="unit-name linklike" onClick={() => onOpenArea({ scope: 'unit', id: u.id })}>{u.name}</button>
                   {m !== null && <span className="unit-mean" style={{ background: `var(--g${meanGrade(m)})` }}>{m.toFixed(1)}</span>}
                 </th>;
               })}
             </tr>
             <tr>
-              {units.map(u => [
-                <th key={u.id + 'ch'}><span className="sub-head">CH</span></th>,
-                <th key={u.id + 'mid'} className="live-head"><span className="sub-head">Live<br />Projects</span></th>,
-                <th key={u.id + 'fs'} className="usep"><span className="sub-head">FS</span></th>,
+              {units.flatMap(u => [
+                ...(!showAgreed ? [
+                  <th key={u.id + 'ch'}><span className="sub-head">CH</span></th>,
+                  <th key={u.id + 'fs'}><span className="sub-head">FS</span></th>,
+                ] : []),
+                <th key={u.id + 'agreed'}><span className="sub-head">Agreed</span></th>,
+                <th key={u.id + 'sq'} className="live-head usep"><span className="sub-head">Live<br />Projects</span></th>,
               ])}
             </tr>
           </thead>
           <tbody>
             {BANDS.map(b => (
-              <FragmentBand key={b.name} band={b} units={units} critById={critById} Chip={Chip} CircleCell={CircleCell} />
+              <FragmentBand key={b.name} band={b} units={units} critById={critById} GroupCells={GroupCells} colsPerGroup={colsPerGroup} />
             ))}
             <tr className="band"><td>Unit-critical<span>scored for its own unit only</span></td>
-              <td colSpan={units.length * 3} style={{ background: 'var(--ink)' }} /></tr>
+              <td colSpan={units.length * colsPerGroup} style={{ background: 'var(--ink)' }} /></tr>
             {units.flatMap(u => (CRIT_BY_UNIT[u.id] || []).map(cid => critById[cid]).filter(Boolean).map(c => (
               <tr key={c.id}>
                 <td className="crit" title={critTip(c)}>{c.name}</td>
-                {units.map(u2 => [
-                  <td key={u2.id + 'ch'}>{u2.id === c.unit_id ? <Chip c={c} uid={u2.id} rk="ch" /> : <span className="na">·</span>}</td>,
-                  <td key={u2.id + 'mid'} className="circle-cell">{u2.id === c.unit_id ? <CircleCell c={c} uid={u2.id} /> : null}</td>,
-                  <td key={u2.id + 'fs'} className="usep">{u2.id === c.unit_id ? <Chip c={c} uid={u2.id} rk="fs" /> : <span className="na">·</span>}</td>,
-                ])}
+                {units.map(u2 => (
+                  u2.id === c.unit_id
+                    ? <GroupCells key={u2.id} c={c} uid={u2.id} />
+                    : <PlaceholderCells key={u2.id} showAgreed={showAgreed} />
+                ))}
               </tr>
             )))}
           </tbody>
@@ -197,40 +225,46 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
   );
 }
 
-function FragmentBand({ band, units, critById, Chip, CircleCell }) {
+// Non-matching units in the unit-critical section — dots that keep column
+// alignment with whatever the current toggle state renders elsewhere.
+function PlaceholderCells({ showAgreed }) {
+  return (
+    <>
+      {!showAgreed && <td><span className="na">·</span></td>}
+      {!showAgreed && <td><span className="na">·</span></td>}
+      <td><span className="na">·</span></td>
+      <td className="circle-cell usep" />
+    </>
+  );
+}
+
+function FragmentBand({ band, units, critById, GroupCells, colsPerGroup }) {
   return (
     <>
       <tr className="band"><td>{band.name}<span>{band.note}</span></td>
-        <td colSpan={units.length * 3} style={{ background: 'var(--ink)' }} /></tr>
+        <td colSpan={units.length * colsPerGroup} style={{ background: 'var(--ink)' }} /></tr>
       {band.ids.map(id => critById[id]).filter(Boolean).map(c => (
         <tr key={c.id}>
           <td className="crit" title={critTip(c)}>{c.name}</td>
-          {units.map(u => (
-            <FragCells key={u.id} c={c} u={u} Chip={Chip} CircleCell={CircleCell} />
-          ))}
+          {units.map(u => <GroupCells key={u.id} c={c} uid={u.id} />)}
         </tr>
       ))}
     </>
   );
 }
-function FragCells({ c, u, Chip, CircleCell }) {
-  return <>
-    <td><Chip c={c} uid={u.id} rk="ch" /></td>
-    <td className="circle-cell"><CircleCell c={c} uid={u.id} /></td>
-    <td className="usep"><Chip c={c} uid={u.id} rk="fs" /></td>
-  </>;
-}
 
 function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, liveCountByCell, onOpenArea, onOpenCriterion, onOpenCase }) {
   const { ofuncs, ocrit, oscores } = data;
+  const colsPerGroup = showAgreed ? 2 : 4;
   const scoreOf = (fid, cid, rk) => {
     const rev = REVIEWERS.find(r => r.key === rk).name;
     return oscores.find(s => s.function_id === fid && s.criterion_id === cid && s.reviewer === rev)?.score || 0;
   };
+  const agreedFor = (fid, cid) => finalScoreFor(data, { scope: 'org', unit_id: null, function_id: fid, criterion_id: cid });
   const rowMean = fid => {
     const vals = [];
     ocrit.forEach(c => {
-      const agreed = finalScoreFor(data, { scope: 'org', unit_id: null, function_id: fid, criterion_id: c.id });
+      const agreed = agreedFor(fid, c.id);
       if (agreed) { vals.push(agreed, agreed); return; }
       REVIEWERS.forEach(r => { const g = scoreOf(fid, c.id, r.key); if (g) vals.push(g); });
     });
@@ -250,16 +284,23 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, liveCountByC
     setPick(null);
   };
   const Chip = ({ f, c, rk }) => {
-    const agreed = showAgreed ? finalScoreFor(data, { scope: 'org', unit_id: null, function_id: f.id, criterion_id: c.id }) : null;
-    if (agreed) {
-      return <button className={`chip s${agreed}`} disabled title={`Agreed final score: ${agreed}`}>{agreed}</button>;
-    }
     const g = scoreOf(f.id, c.id, rk), mine = rk === myKey, clickable = canEdit && mine;
     return (
       <button className={`chip ${g ? ('s' + g) : 'empty'} ${clickable ? '' : 'readonly'}`}
         onClick={clickable ? (e) => open(e, f, c) : undefined}>{g || '–'}</button>
     );
   };
+  const GroupCells = ({ f, c }) => (
+    <>
+      {!showAgreed && <td><Chip f={f} c={c} rk="ch" /></td>}
+      {!showAgreed && <td><Chip f={f} c={c} rk="fs" /></td>}
+      <td><AgreedChip agreed={agreedFor(f.id, c.id)} /></td>
+      <td className="circle-cell usep">
+        <CircleNav count={liveCountByCell[`org:${f.id}:${c.id}`] || 0} label={c.name}
+          onOpen={() => onOpenCriterion({ scope: 'org', unit_id: null, function_id: f.id, criterion_id: c.id })} />
+      </td>
+    </>
+  );
   return (
     <>
       <div className="panel-h"><span className="bar" style={{ background: 'var(--g2)' }} />Organisation — horizontal functions</div>
@@ -267,33 +308,33 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, liveCountByC
         <table className="matrix">
           <colgroup>
             <col style={{ width: 220 }} />
-            {ocrit.flatMap(c => [<col key={c.id + '-ch'} />, <col key={c.id + '-mid'} style={{ width: 60 }} />, <col key={c.id + '-fs'} />])}
+            {ocrit.flatMap(c => [
+              ...(!showAgreed ? [<col key={c.id + '-ch'} />, <col key={c.id + '-fs'} />] : []),
+              <col key={c.id + '-agreed'} />,
+              <col key={c.id + '-sq'} style={{ width: 60 }} />,
+            ])}
             <col style={{ width: 90 }} />
           </colgroup>
           <thead>
             <tr><th className="crit-col" rowSpan={3} />{ocrit.map(c =>
-              <th key={c.id} colSpan={3} className="usep" title={critTip(c)}><span className="unit-name">{c.name}</span></th>)}
+              <th key={c.id} colSpan={colsPerGroup} className="usep" title={critTip(c)}><span className="unit-name">{c.name}</span></th>)}
               <th rowSpan={3}><span className="sub-head">MEAN</span></th></tr>
             <tr>{ocrit.map(c =>
-              <th key={c.id + 'blurb'} colSpan={3} className="usep cat-blurb">{ORG_CRIT_BLURB[c.id]}</th>)}</tr>
-            <tr>{ocrit.map(c => [
-              <th key={c.id + 'ch'}><span className="sub-head">CH</span></th>,
-              <th key={c.id + 'mid'} className="live-head"><span className="sub-head">Live<br />Projects</span></th>,
-              <th key={c.id + 'fs'} className="usep"><span className="sub-head">FS</span></th>,
+              <th key={c.id + 'blurb'} colSpan={colsPerGroup} className="usep cat-blurb">{ORG_CRIT_BLURB[c.id]}</th>)}</tr>
+            <tr>{ocrit.flatMap(c => [
+              ...(!showAgreed ? [
+                <th key={c.id + 'ch'}><span className="sub-head">CH</span></th>,
+                <th key={c.id + 'fs'}><span className="sub-head">FS</span></th>,
+              ] : []),
+              <th key={c.id + 'agreed'}><span className="sub-head">Agreed</span></th>,
+              <th key={c.id + 'sq'} className="live-head usep"><span className="sub-head">Live<br />Projects</span></th>,
             ])}</tr>
           </thead>
           <tbody>
             {ofuncs.map(f => {
               const m = rowMean(f.id); return (
                 <tr key={f.id}><td className="crit"><button className="linklike" onClick={() => onOpenArea({ scope: 'org', id: f.id })}>{f.name}</button></td>
-                  {ocrit.map(c => [
-                    <td key={c.id + 'ch'}><Chip f={f} c={c} rk="ch" /></td>,
-                    <td key={c.id + 'mid'} className="circle-cell">
-                      <CircleNav count={liveCountByCell[`org:${f.id}:${c.id}`] || 0} label={c.name}
-                        onOpen={() => onOpenCriterion({ scope: 'org', unit_id: null, function_id: f.id, criterion_id: c.id })} />
-                    </td>,
-                    <td key={c.id + 'fs'} className="usep"><Chip f={f} c={c} rk="fs" /></td>,
-                  ])}
+                  {ocrit.map(c => <GroupCells key={c.id} f={f} c={c} />)}
                   <td>{m === null ? <span className="na">–</span> :
                     <span className="unit-mean" style={{ background: `var(--g${meanGrade(m)})`, marginTop: 0 }}>{m.toFixed(1)}</span>}</td>
                 </tr>);
