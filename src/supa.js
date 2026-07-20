@@ -14,4 +14,5 @@ export function weekStart(d = new Date()) {
 export const REVIEWERS = [
   { key: 'ch', name: 'Chris Haresign', short: 'CH' },
   { key: 'fs', name: 'Fleur Sexton',  short: 'FS' },
+  { key: 'sb', name: 'SB',            short: 'SB' }, // TODO: full name, waiting on Chris
 ];

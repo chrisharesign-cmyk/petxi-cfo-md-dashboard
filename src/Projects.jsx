@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { REVIEWERS } from './supa';
 import { addProject, markProjectDiscussed } from './data';
-import { STATUS_LABEL, PACE_LABEL, statusBadge, statusSortKey, fmtDate, overdueBy, daysInStage, isOverStageLimit, RAG_LABEL, autoTarget } from './util';
+import { STATUS_LABEL, PACE_LABEL, statusBadge, statusSortKey, fmtDate, overdueBy, daysInStage, isOverStageLimit, RAG_LABEL, autoTarget, maxScore } from './util';
 import { OwnerEditor, RagEditor, TargetEditor, StatusMenu } from './ProjectControls';
 import EditableText from './EditableText';
 
@@ -223,7 +223,7 @@ function AddProjectForm({ data, me, onDone }) {
       const scoreRows = scope === 'unit' ? data.scores : data.oscores;
       const relevant = scoreRows.filter(s => s.criterion_id === criterionId &&
         (scope === 'unit' ? s.unit_id === areaId : s.function_id === areaId));
-      const grade = relevant.length ? Math.max(...relevant.map(s => s.score)) : null;
+      const grade = maxScore(relevant);
       await addProject({
         title: title.trim(), scope,
         unit_id: scope === 'unit' ? areaId : null,

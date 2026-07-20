@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { REVIEWERS } from './supa';
 import { loadRootCause, saveRootCause, periodMeansForCriterion, loadMeetingsForCriterion, addProject, clearContentFlag } from './data';
-import { fmtDate, autoTarget, statusBadge, PACE_LABEL } from './util';
+import { fmtDate, autoTarget, statusBadge, PACE_LABEL, maxScore } from './util';
 import Sparkline from './Sparkline';
 import EditableCriterionField from './EditableCriterionField';
 
@@ -34,7 +34,7 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
   const scoreCells = REVIEWERS.map(r => {
     const row = scoreRows.find(s => s.criterion_id === criterion_id &&
       (scope === 'unit' ? s.unit_id === unit_id : s.function_id === function_id) && s.reviewer === r.name);
-    return { reviewer: r, score: row?.score };
+    return { reviewer: r, score: row?.score, na: !!row && row.score == null };
   });
 
   // Primary-home projects, plus anything "also affects"-tagged to this cell
@@ -123,10 +123,10 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
 
       <div className="card" style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: '1.4rem' }}>
-          {scoreCells.map(({ reviewer, score }) => (
+          {scoreCells.map(({ reviewer, score, na }) => (
             <div key={reviewer.key} style={{ textAlign: 'center' }}>
               <div className="muted" style={{ fontSize: '.7rem', fontFamily: 'var(--mono)', marginBottom: '.2rem' }}>{reviewer.short}</div>
-              <span className={`chip ${score ? 's' + score : 'empty'}`} style={{ position: 'static' }}>{score || '–'}</span>
+              <span className={`chip ${score ? 's' + score : na ? 'na' : 'empty'}`} style={{ position: 'static' }}>{score || (na ? 'N/A' : '–')}</span>
             </div>
           ))}
         </div>
@@ -162,7 +162,7 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
           {!editingRC && <button className="btn" onClick={() => { setRcBody(rootCause?.body || ''); setEditingRC(true); }}>{rootCause?.body ? 'Edit' : '+ Add'}</button>}
         </div>
         <p className="muted" style={{ fontSize: '.78rem', marginTop: '.2rem' }}>
-          Chris and Fleur's own analysis — separate from Claude's starting point above, which already covers
+          The reviewers' own analysis — separate from Claude's starting point above, which already covers
           "why this is probably happening."
         </p>
         {editingRC ? (
@@ -257,7 +257,7 @@ function AddCriterionProject({ scope, unit_id, function_id, criterion_id, data, 
   const scoreRows = scope === 'unit' ? data.scores : data.oscores;
   const relevant = scoreRows.filter(s => s.criterion_id === criterion_id &&
     (scope === 'unit' ? s.unit_id === unit_id : s.function_id === function_id));
-  const grade = relevant.length ? Math.max(...relevant.map(s => s.score)) : null;
+  const grade = maxScore(relevant);
 
   const submit = async (e) => {
     e.preventDefault();

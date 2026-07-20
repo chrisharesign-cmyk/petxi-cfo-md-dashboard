@@ -147,7 +147,7 @@ function Dashboard({ me, onLeave }) {
           <div className="key-item"><span className="key-dot s4">4</span> Critical — in ICU, run under direct control</div>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '.6rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '.35rem', fontSize: '.78rem', cursor: 'pointer' }}
-              title="Show the agreed final score in place of Chris's and Fleur's individual reads, wherever one's been set">
+              title="Show the agreed final score in place of each reviewer's individual read, wherever one's been set">
               <input type="checkbox" checked={showAgreed} onChange={e => setShowAgreed(e.target.checked)} />
               Show agreed scores
             </label>
@@ -197,8 +197,8 @@ function LockDialog({ state, data, onConfirm, onClose, onResolve }) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <h3>Lock this SAR?</h3>
-        <p className="muted">This is the final step. Locking freezes every grade for <b>both</b> reviewers this
-          period, including Fleur's. After locking, no cell is clickable and the wording each grade was judged
+        <p className="muted">This is the final step. Locking freezes every grade for <b>every</b> reviewer this
+          period. After locking, no cell is clickable and the wording each grade was judged
           against is snapshotted permanently. This cannot be undone — the next period opens fresh drafts.</p>
         <div className="modal-actions">
           <button onClick={onClose}>Cancel</button>

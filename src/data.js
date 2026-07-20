@@ -65,16 +65,23 @@ export async function clearContentFlag({ scope, unit_id, function_id, criterion_
 }
 
 // ---- draft scoring (blocked once the period is locked — caller must check) ----
+// `score` of 1-4 is a real grade; `score: null` is an explicit "N/A" — the
+// reviewer has looked and this genuinely isn't theirs to grade (e.g. an area
+// they've never worked with). Either way a row exists; clearScore below is
+// the separate "remove this, go back to not-yet-scored" action.
+const numericGrades = arr => arr.filter(s => s != null);
 export async function setScore({ criterion_id, unit_id, score, reviewer, period_id, week = weekStart() }) {
   const { data: existing } = await supa.from('scores').select('reviewer,score')
     .match({ criterion_id, unit_id, week_start: week, period_id });
-  const oldGrade = existing?.length ? Math.max(...existing.map(s => s.score)) : null;
+  const oldNums = numericGrades((existing || []).map(s => s.score));
+  const oldGrade = oldNums.length ? Math.max(...oldNums) : null;
   const { error } = await supa.from('scores')
     .upsert({ criterion_id, unit_id, week_start: week, period_id, score, reviewer, updated_at: new Date().toISOString() },
             { onConflict: 'criterion_id,unit_id,week_start,reviewer' });
   if (error) throw error;
-  const others = (existing || []).filter(s => s.reviewer !== reviewer).map(s => s.score);
-  const newGrade = Math.max(score, ...others, 0) || null;
+  const otherNums = numericGrades((existing || []).filter(s => s.reviewer !== reviewer).map(s => s.score));
+  const newNums = numericGrades([score, ...otherNums]);
+  const newGrade = newNums.length ? Math.max(...newNums) : null;
   if (newGrade !== oldGrade) await flagGradeChange({ scope: 'unit', unit_id, criterion_id, old_grade: oldGrade, new_grade: newGrade });
 }
 export async function clearScore({ criterion_id, unit_id, reviewer, period_id, week = weekStart() }) {
@@ -85,13 +92,15 @@ export async function clearScore({ criterion_id, unit_id, reviewer, period_id, w
 export async function setOrgScore({ function_id, criterion_id, score, reviewer, period_id, week = weekStart() }) {
   const { data: existing } = await supa.from('org_scores').select('reviewer,score')
     .match({ function_id, criterion_id, week_start: week, period_id });
-  const oldGrade = existing?.length ? Math.max(...existing.map(s => s.score)) : null;
+  const oldNums = numericGrades((existing || []).map(s => s.score));
+  const oldGrade = oldNums.length ? Math.max(...oldNums) : null;
   const { error } = await supa.from('org_scores')
     .upsert({ function_id, criterion_id, week_start: week, period_id, score, reviewer, updated_at: new Date().toISOString() },
             { onConflict: 'function_id,criterion_id,week_start,reviewer' });
   if (error) throw error;
-  const others = (existing || []).filter(s => s.reviewer !== reviewer).map(s => s.score);
-  const newGrade = Math.max(score, ...others, 0) || null;
+  const otherNums = numericGrades((existing || []).filter(s => s.reviewer !== reviewer).map(s => s.score));
+  const newNums = numericGrades([score, ...otherNums]);
+  const newGrade = newNums.length ? Math.max(...newNums) : null;
   if (newGrade !== oldGrade) await flagGradeChange({ scope: 'org', function_id, criterion_id, old_grade: oldGrade, new_grade: newGrade });
 }
 export async function clearOrgScore({ function_id, criterion_id, reviewer, period_id, week = weekStart() }) {
@@ -136,8 +145,9 @@ async function loadForPeriod(periodId) {
   };
 }
 
-// Worst grade per cell-key, across both reviewers — a project's identity
-// ignores the reviewer dimension, so CH and FS both grading 3 is one cell.
+// Worst grade per cell-key, across every reviewer — a project's identity
+// ignores the reviewer dimension, so two reviewers both grading 3 is one
+// cell. N/A rows (score null) never win the "worst" comparison.
 export function worstGrades(scores, oscores) {
   const worst = {};
   scores.forEach(s => {
@@ -155,7 +165,7 @@ export function worstGrades(scores, oscores) {
 
 // The final, explicit lock action. Returns { blocked: true, cells: [...] }
 // if any 4-graded cell has no live project, otherwise snapshots wording and
-// freezes both reviewers. Projects are no longer auto-spooled on lock —
+// freezes every reviewer. Projects are no longer auto-spooled on lock —
 // every criterion has its own always-visible page now (root cause +
 // projects), so there's no gap for a placeholder project to fill.
 export async function lockPeriod(periodId, lockedBy) {

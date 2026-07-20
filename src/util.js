@@ -210,6 +210,14 @@ export function finalScoreFor(data, { scope, unit_id, function_id, criterion_id 
 // same "nothing slips through unnoticed" logic as before reconciliation
 // existed. Distinct from project.progress_rag, which is the informal
 // on-track/at-risk read between formal SAR periods.
+// A score row's `score` is null for an explicit "N/A" (the reviewer has
+// looked and it's genuinely not theirs to grade) — that shouldn't count
+// toward a max/mean any differently to not having scored it at all.
+export function maxScore(rows) {
+  const nums = rows.map(r => r.score).filter(n => n != null);
+  return nums.length ? Math.max(...nums) : null;
+}
+
 export function officialCurrentGrade(p, data) {
   const agreed = finalScoreFor(data, {
     scope: p.scope, unit_id: p.unit_id, function_id: p.function_id, criterion_id: p.criterion_id,
@@ -218,7 +226,7 @@ export function officialCurrentGrade(p, data) {
   const rows = p.scope === 'unit'
     ? data.scores.filter(s => s.unit_id === p.unit_id && s.criterion_id === p.criterion_id)
     : data.oscores.filter(s => s.function_id === p.function_id && s.criterion_id === p.criterion_id);
-  return rows.length ? Math.max(...rows.map(r => r.score)) : null;
+  return maxScore(rows);
 }
 
 // progress_rag is an informal on-track/at-risk read a project owner can set

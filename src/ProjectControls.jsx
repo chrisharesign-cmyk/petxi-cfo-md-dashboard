@@ -5,7 +5,7 @@ import { promoteLive, pauseProject, resumeLive, moveBackLive,
 import { PACE_LABEL, PACE_DESC, friendlyProjectError, fmtDate, autoTarget, upcomingQuarters, quarterLabel, RAG_LABEL, officialCurrentGrade } from './util';
 import { usePrompt } from './Dialogs';
 
-// Owner isn't limited to the two reviewers — anyone (Josh, ops staff, etc.)
+// Owner isn't limited to reviewers — anyone (Josh, ops staff, etc.)
 // can be named. Typing a new name and saving it writes straight to
 // projects.owner in Supabase; it then shows up as a suggestion next time,
 // built from every distinct owner already in use.

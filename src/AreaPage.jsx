@@ -80,7 +80,13 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCr
                     )}
                   </td>
                   {cells.map(({ reviewer, row }) => (
-                    <td key={reviewer.key}>{row ? <span className={`chip s${row.score}`} style={{ position: 'static' }}>{row.score}</span> : '—'}</td>
+                    <td key={reviewer.key}>
+                      {row && row.score != null
+                        ? <span className={`chip s${row.score}`} style={{ position: 'static' }}>{row.score}</span>
+                        : row
+                          ? <span className="chip na" style={{ position: 'static' }}>N/A</span>
+                          : '—'}
+                    </td>
                   ))}
                   <td className="muted" style={{ fontSize: '.76rem' }}>
                     {judged || <span className="muted">Not yet scored — nothing to judge against.</span>}
