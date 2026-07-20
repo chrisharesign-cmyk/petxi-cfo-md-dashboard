@@ -167,21 +167,28 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
 .statusmenu button:hover{background:var(--line-soft)}
 
 /* ---- activity tab ---- */
-.exec-summary{font-size:.9rem;margin-bottom:1rem;background:var(--ink);color:#f2f0e8;border-color:var(--ink)}
 .win-card{border-color:#7fb374;background:linear-gradient(180deg,#f3faf1,var(--card) 60%)}
 .stale-card{border-color:#c98080;background:linear-gradient(180deg,#fbf1f1,var(--card) 60%)}
-.activity-row{display:flex;gap:.7rem;align-items:flex-start;padding:.5rem 0;border-bottom:1px solid var(--line-soft);font-size:.9rem}
+.activity-row{padding:.5rem 0;border-bottom:1px solid var(--line-soft);font-size:.9rem}
 .activity-row:last-child{border-bottom:none}
-.activity-row .ico{flex:none;font-size:1.05rem;line-height:1.4}
-/* compact stat cards — same mono-uppercase eyebrow + bold-figure language
-   as the period header on the SAR screen (.sub-head / .period-q), so the
-   two small summary cards up top read as part of the same design system
-   rather than ad hoc prose headings */
-.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-.stat-card{padding:1.1rem 1.4rem}
-.stat-label{display:block;font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:.4rem}
-.stat-value{display:inline-block;font-weight:800;font-size:1.5rem;letter-spacing:-.02em;color:var(--ink)}
-@media (max-width:720px){.stat-grid{grid-template-columns:1fr}}
+/* Headline KPI tiles — the same mono-uppercase eyebrow + bold-figure
+   language as the period header on the SAR screen (.sub-head / .period-q),
+   reused for both the status-coloured headline row and the plain
+   trend/meeting context row below it, so every number on this page reads
+   as one family instead of several competing card styles. Status colour
+   is the .win-card / .stale-card tint already used elsewhere — a zero of
+   a bad thing reads as good news, not a wall of black-and-red. */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem}
+.kpi-tile{padding:1.1rem 1.3rem}
+.kpi-label{display:block;font-family:var(--mono);font-size:.64rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:.4rem}
+.kpi-value{display:block;font-weight:800;font-size:2rem;letter-spacing:-.03em;color:var(--ink)}
+.kpi-sub{display:block;font-size:.76rem;color:var(--ink-soft);margin-top:.35rem}
+@media (max-width:600px){.kpi-row{grid-template-columns:repeat(2,1fr)}}
+/* ---- activity breakdown chips — surfaces the raw counts behind the
+   headline numbers instead of burying them in the table below ---- */
+.activity-breakdown{display:flex;flex-wrap:wrap;gap:.5rem;margin:.6rem 0 1rem}
+.abchip{font-family:var(--mono);font-size:.7rem;color:var(--ink-soft);background:var(--paper);border:1px solid var(--line);border-radius:99px;padding:.28rem .75rem}
+.abchip b{color:var(--ink);font-weight:700}
 
 /* ---- sortable table headers ---- */
 .ptable th.sortable{cursor:pointer;user-select:none}
