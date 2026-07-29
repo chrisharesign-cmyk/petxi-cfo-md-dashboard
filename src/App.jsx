@@ -147,7 +147,7 @@ function Dashboard({ me, onLeave }) {
           <div className="key-item"><span className="key-dot s4">4</span> Critical — in ICU, run under direct control</div>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '.6rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '.35rem', fontSize: '.78rem', cursor: 'pointer' }}
-              title="Show the agreed final score in place of each reviewer's individual read, wherever one's been set">
+              title="Show the agreed final score in place of every OTHER reviewer's individual read (your own column always stays visible), wherever one's been set">
               <input type="checkbox" checked={showAgreed} onChange={e => setShowAgreed(e.target.checked)} />
               Show agreed scores
             </label>

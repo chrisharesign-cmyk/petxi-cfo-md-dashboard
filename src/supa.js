@@ -21,4 +21,6 @@ export const REVIEWERS = [
   { key: 'sb', name: 'Sarah Beavan',  short: 'SB' },
   { key: 'jh', name: 'Josh Hill',     short: 'JH', blind: true },
   { key: 'sz', name: 'Sandra Zubyte', short: 'SZ', blind: true },
+  { key: 'ja', name: 'Jamie',         short: 'JA' }, // TODO: surname, waiting on Chris
+  { key: 'jk', name: 'Jake',          short: 'JK' }, // TODO: surname, waiting on Chris
 ];

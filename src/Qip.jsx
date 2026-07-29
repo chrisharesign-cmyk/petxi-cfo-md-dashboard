@@ -73,7 +73,7 @@ function DotLegend({ showAgreed }) {
       <b>The square</b> — always the last column — is the number of live projects running against that criterion
       (or "–" for none). <b>Double-click it</b> to open that criterion's own page: root cause analysis, and every
       project (solution) against it. {showAgreed
-        ? <>Individual reviewer scores are hidden right now — toggle "Show agreed scores" off to see them again.</>
+        ? <>Other reviewers' scores are hidden right now — your own column always stays visible. Toggle "Show agreed scores" off to see everyone's.</>
         : <>The <b>Agreed</b> column shows the jointly-decided final grade once you've set one on the Agree Scores tab. A reviewer can mark a cell <b>N/A</b> if it's genuinely not theirs to grade.</>}
     </div>
   );
@@ -82,7 +82,11 @@ function DotLegend({ showAgreed }) {
 export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liveCountByCell, onOpenArea, onOpenCriterion, onOpenCase }) {
   const { units, criteria, ofuncs, ocrit, scores, oscores, period } = data;
   const critById = Object.fromEntries(criteria.map(c => [c.id, c]));
-  const colsPerGroup = 2 + (showAgreed ? 0 : REVIEWERS.length);
+  // "Show agreed scores" hides everyone ELSE's column, never your own — the
+  // toggle is for decluttering other people's reads, not for hiding the one
+  // column you actually need in order to score anything.
+  const visibleReviewers = showAgreed ? REVIEWERS.filter(r => r.key === myKey) : REVIEWERS;
+  const colsPerGroup = 2 + visibleReviewers.length;
 
   const myReviewer = REVIEWERS.find(r => r.key === myKey);
   const completion = reviewerCompletion(data, myReviewer?.name);
@@ -150,11 +154,12 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
       onOpen={() => onOpenCriterion({ scope: 'unit', unit_id: uid, function_id: null, criterion_id: c.id })} />
   );
 
-  // Every visible cell for one unit's column group, in fixed order: one per
-  // reviewer (dropped when showAgreed), Agreed, Live Projects square.
+  // Every visible cell for one unit's column group, in fixed order:
+  // visibleReviewers (always includes your own, others dropped when
+  // showAgreed), Agreed, Live Projects square.
   const GroupCells = ({ c, uid }) => (
     <>
-      {!showAgreed && REVIEWERS.map(r => <td key={r.key}><Chip c={c} uid={uid} rk={r.key} /></td>)}
+      {visibleReviewers.map(r => <td key={r.key}><Chip c={c} uid={uid} rk={r.key} /></td>)}
       <td><AgreedChip agreed={agreedFor(c.id, uid)} hidden={hideOthers} /></td>
       <td className="circle-cell usep"><CircleCell c={c} uid={uid} /></td>
     </>
@@ -169,7 +174,7 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
           <colgroup>
             <col style={{ width: 220 }} />
             {units.flatMap(u => [
-              ...(!showAgreed ? REVIEWERS.map(r => <col key={u.id + '-' + r.key} />) : []),
+              ...visibleReviewers.map(r => <col key={u.id + '-' + r.key} />),
               <col key={u.id + '-agreed'} />,
               <col key={u.id + '-sq'} style={{ width: 60 }} />,
             ])}
@@ -191,7 +196,7 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
             </tr>
             <tr>
               {units.flatMap(u => [
-                ...(!showAgreed ? REVIEWERS.map(r => <th key={u.id + r.key}><span className="sub-head">{r.short}</span></th>) : []),
+                ...visibleReviewers.map(r => <th key={u.id + r.key}><span className="sub-head">{r.short}</span></th>),
                 <th key={u.id + 'agreed'}><span className="sub-head">Agreed</span></th>,
                 <th key={u.id + 'sq'} className="live-head usep"><span className="sub-head">Live<br />Projects</span></th>,
               ])}
@@ -209,7 +214,7 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
                 {units.map(u2 => (
                   u2.id === c.unit_id
                     ? <GroupCells key={u2.id} c={c} uid={u2.id} />
-                    : <PlaceholderCells key={u2.id} showAgreed={showAgreed} />
+                    : <PlaceholderCells key={u2.id} count={visibleReviewers.length} />
                 ))}
               </tr>
             )))}
@@ -252,10 +257,10 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
 
 // Non-matching units in the unit-critical section — dots that keep column
 // alignment with whatever the current toggle state renders elsewhere.
-function PlaceholderCells({ showAgreed }) {
+function PlaceholderCells({ count }) {
   return (
     <>
-      {!showAgreed && REVIEWERS.map(r => <td key={r.key}><span className="na">·</span></td>)}
+      {Array.from({ length: count }, (_, i) => <td key={i}><span className="na">·</span></td>)}
       <td><span className="na">·</span></td>
       <td className="circle-cell usep" />
     </>
@@ -279,7 +284,8 @@ function FragmentBand({ band, units, critById, GroupCells, colsPerGroup }) {
 
 function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, hideOthers, liveCountByCell, onOpenArea, onOpenCriterion, onOpenCase }) {
   const { ofuncs, ocrit, oscores } = data;
-  const colsPerGroup = 2 + (showAgreed ? 0 : REVIEWERS.length);
+  const visibleReviewers = showAgreed ? REVIEWERS.filter(r => r.key === myKey) : REVIEWERS;
+  const colsPerGroup = 2 + visibleReviewers.length;
   const scoreOf = (fid, cid, rk) => {
     const rev = REVIEWERS.find(r => r.key === rk).name;
     const row = oscores.find(s => s.function_id === fid && s.criterion_id === cid && s.reviewer === rev);
@@ -321,7 +327,7 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, hideOthers, 
   };
   const GroupCells = ({ f, c }) => (
     <>
-      {!showAgreed && REVIEWERS.map(r => <td key={r.key}><Chip f={f} c={c} rk={r.key} /></td>)}
+      {visibleReviewers.map(r => <td key={r.key}><Chip f={f} c={c} rk={r.key} /></td>)}
       <td><AgreedChip agreed={agreedFor(f.id, c.id)} hidden={hideOthers} /></td>
       <td className="circle-cell usep">
         <CircleNav count={liveCountByCell[`org:${f.id}:${c.id}`] || 0} label={c.name}
@@ -337,7 +343,7 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, hideOthers, 
           <colgroup>
             <col style={{ width: 220 }} />
             {ocrit.flatMap(c => [
-              ...(!showAgreed ? REVIEWERS.map(r => <col key={c.id + '-' + r.key} />) : []),
+              ...visibleReviewers.map(r => <col key={c.id + '-' + r.key} />),
               <col key={c.id + '-agreed'} />,
               <col key={c.id + '-sq'} style={{ width: 60 }} />,
             ])}
@@ -350,7 +356,7 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, hideOthers, 
             <tr>{ocrit.map(c =>
               <th key={c.id + 'blurb'} colSpan={colsPerGroup} className="usep cat-blurb">{ORG_CRIT_BLURB[c.id]}</th>)}</tr>
             <tr>{ocrit.flatMap(c => [
-              ...(!showAgreed ? REVIEWERS.map(r => <th key={c.id + r.key}><span className="sub-head">{r.short}</span></th>) : []),
+              ...visibleReviewers.map(r => <th key={c.id + r.key}><span className="sub-head">{r.short}</span></th>),
               <th key={c.id + 'agreed'}><span className="sub-head">Agreed</span></th>,
               <th key={c.id + 'sq'} className="live-head usep"><span className="sub-head">Live<br />Projects</span></th>,
             ])}</tr>
