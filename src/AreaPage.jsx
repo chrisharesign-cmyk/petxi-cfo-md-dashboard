@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { REVIEWERS } from './supa';
 import { periodMeans } from './data';
-import { fmtDate, buildAreaPrompt, finalScoreFor } from './util';
+import { fmtDate, buildAreaPrompt, finalScoreFor, reviewerCompletion } from './util';
 import EditableText from './EditableText';
 import Sparkline from './Sparkline';
 
-export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCriterion, onRefresh }) {
+export default function AreaPage({ scope, id, data, myKey, onBack, onOpenCase, onOpenCriterion, onRefresh }) {
+  const myReviewer = REVIEWERS.find(r => r.key === myKey);
+  const hideOthers = !!myReviewer?.blind && !reviewerCompletion(data, myReviewer?.name).complete;
   const [trajectory, setTrajectory] = useState([]);
   const [copied, setCopied] = useState(false);
   useEffect(() => { periodMeans(scope, id).then(setTrajectory).catch(() => {}); }, [scope, id]);
@@ -26,13 +28,16 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCr
   // The standard this criterion was actually judged against: the agreed
   // final score's descriptor if one's been set, else whichever grade the
   // reviewers' own scores currently point to (worst-of-both, same as
-  // everywhere else pre-agreement).
+  // everywhere else pre-agreement). While blind and incomplete, only your
+  // own score counts here — otherwise the wording itself would give away
+  // what everyone else scored, even with the raw numbers hidden.
   const descriptorsFor = (c) => (scope === 'unit' ? c.descriptors_by_unit?.[id] : c.descriptors_by_function?.[id]) || c.descriptors;
   const judgedAgainst = (c, cells) => {
-    const agreed = finalScoreFor(data, {
+    const agreed = hideOthers ? null : finalScoreFor(data, {
       scope, unit_id: scope === 'unit' ? id : null, function_id: scope === 'org' ? id : null, criterion_id: c.id,
     });
-    const scored = cells.map(x => x.row?.score).filter(Boolean);
+    const relevant = hideOthers ? cells.filter(x => x.reviewer.key === myKey) : cells;
+    const scored = relevant.map(x => x.row?.score).filter(x => x != null);
     const grade = agreed || (scored.length ? Math.max(...scored) : null);
     return grade ? descriptorsFor(c)?.[grade - 1] : null;
   };
@@ -64,7 +69,8 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCr
           <tbody>
             {criteria.map(c => {
               const cells = gradeFor(c.id);
-              const snap = cells.find(x => x.row?.descriptor_snapshot)?.row?.descriptor_snapshot;
+              const snapCells = hideOthers ? cells.filter(x => x.reviewer.key === myKey) : cells;
+              const snap = snapCells.find(x => x.row?.descriptor_snapshot)?.row?.descriptor_snapshot;
               const judged = snap || judgedAgainst(c, cells);
               return (
                 <tr key={c.id}>
@@ -81,11 +87,13 @@ export default function AreaPage({ scope, id, data, onBack, onOpenCase, onOpenCr
                   </td>
                   {cells.map(({ reviewer, row }) => (
                     <td key={reviewer.key}>
-                      {row && row.score != null
-                        ? <span className={`chip s${row.score}`} style={{ position: 'static' }}>{row.score}</span>
-                        : row
-                          ? <span className="chip na" style={{ position: 'static' }}>N/A</span>
-                          : '—'}
+                      {hideOthers && reviewer.key !== myKey
+                        ? <span className="chip hidden" style={{ position: 'static' }} title="Hidden until you finish scoring every cell yourself">🔒</span>
+                        : row && row.score != null
+                          ? <span className={`chip s${row.score}`} style={{ position: 'static' }}>{row.score}</span>
+                          : row
+                            ? <span className="chip na" style={{ position: 'static' }}>N/A</span>
+                            : '—'}
                     </td>
                   ))}
                   <td className="muted" style={{ fontSize: '.76rem' }}>

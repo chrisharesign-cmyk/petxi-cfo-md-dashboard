@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
 import { REVIEWERS } from './supa';
 import { loadRootCause, saveRootCause, periodMeansForCriterion, loadMeetingsForCriterion, addProject, clearContentFlag } from './data';
-import { fmtDate, autoTarget, statusBadge, PACE_LABEL, maxScore } from './util';
+import { fmtDate, autoTarget, statusBadge, PACE_LABEL, maxScore, reviewerCompletion } from './util';
 import Sparkline from './Sparkline';
 import EditableCriterionField from './EditableCriterionField';
 
 // One criterion's own page: current scores, trend, root cause (why it
 // scores the way it does) and every project (solution) against it — the
 // drill-down reached by double-clicking its circle on the SAR matrix.
-export default function CriterionPage({ scope, unit_id, function_id, criterion_id, data, me, onBack, onOpenCase, onRefresh }) {
+export default function CriterionPage({ scope, unit_id, function_id, criterion_id, data, me, myKey, onBack, onOpenCase, onRefresh }) {
   const area = scope === 'unit' ? data.units.find(u => u.id === unit_id) : data.ofuncs.find(f => f.id === function_id);
   const crit = scope === 'unit' ? data.criteria.find(c => c.id === criterion_id) : data.ocrit.find(c => c.id === criterion_id);
   const areaOrFnId = scope === 'unit' ? unit_id : function_id;
+  const myReviewer = REVIEWERS.find(r => r.key === myKey);
+  const hideOthers = !!myReviewer?.blind && !reviewerCompletion(data, myReviewer?.name).complete;
 
   const [trajectory, setTrajectory] = useState([]);
   const [rootCause, setRootCause] = useState(undefined); // undefined = loading, null = none yet
@@ -66,9 +68,13 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
   const causeArr = crit?.[causeCol]?.[areaKey] || crit?.likely_cause || ['', '', '', ''];
   const improveText = crit?.[solCol]?.[areaKey] ?? crit?.solution ?? '';
 
-  const currentGrade = Math.max(0, ...scoreCells.map(c => c.score || 0)) || null;
+  // While blind and incomplete, only your own score drives the grade shown
+  // here — the current-state text and root-cause analysis below both key
+  // off this, so leaving it be would leak everyone else's read even with
+  // their raw chips hidden.
+  const currentGrade = maxScore(hideOthers ? scoreCells.filter(c => c.reviewer.key === myKey) : scoreCells);
   const gradeIdx = currentGrade ? currentGrade - 1 : null;
-  const flag = (data.contentFlags || []).find(f => f.scope === scope && f.criterion_id === criterion_id &&
+  const flag = hideOthers ? null : (data.contentFlags || []).find(f => f.scope === scope && f.criterion_id === criterion_id &&
     (scope === 'unit' ? f.unit_id === unit_id : f.function_id === function_id));
   const currentStateText = gradeIdx !== null ? descArr[gradeIdx] : null;
   const excellenceText = descArr[0];
@@ -126,7 +132,9 @@ export default function CriterionPage({ scope, unit_id, function_id, criterion_i
           {scoreCells.map(({ reviewer, score, na }) => (
             <div key={reviewer.key} style={{ textAlign: 'center' }}>
               <div className="muted" style={{ fontSize: '.7rem', fontFamily: 'var(--mono)', marginBottom: '.2rem' }}>{reviewer.short}</div>
-              <span className={`chip ${score ? 's' + score : na ? 'na' : 'empty'}`} style={{ position: 'static' }}>{score || (na ? 'N/A' : '–')}</span>
+              {hideOthers && reviewer.key !== myKey
+                ? <span className="chip hidden" style={{ position: 'static' }} title="Hidden until you finish scoring every cell yourself">🔒</span>
+                : <span className={`chip ${score ? 's' + score : na ? 'na' : 'empty'}`} style={{ position: 'static' }}>{score || (na ? 'N/A' : '–')}</span>}
             </div>
           ))}
         </div>
