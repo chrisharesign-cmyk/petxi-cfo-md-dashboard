@@ -15,4 +15,6 @@ export const REVIEWERS = [
   { key: 'ch', name: 'Chris Haresign', short: 'CH' },
   { key: 'fs', name: 'Fleur Sexton',  short: 'FS' },
   { key: 'sb', name: 'Sarah Beavan',  short: 'SB' },
+  { key: 'jh', name: 'Josh Hill',     short: 'JH' },
+  { key: 'sz', name: 'Sandra Zubyte', short: 'SZ' },
 ];

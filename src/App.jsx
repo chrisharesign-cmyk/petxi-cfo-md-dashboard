@@ -53,7 +53,7 @@ function Dashboard({ me, onLeave }) {
   const [areaView, setAreaView] = useState(null);
   const [criterionView, setCriterionView] = useState(null);
   const [caseFileId, setCaseFileId] = useState(null);
-  const [showAgreed, setShowAgreed] = useState(false);
+  const [showAgreed, setShowAgreed] = useState(true);
   const openCriterion = (c) => { setCriterionView(c); setAreaView(null); };
   const openArea = (a) => { setAreaView(a); setCriterionView(null); };
   const myKey = REVIEWERS.find(r => r.name === me)?.key;
