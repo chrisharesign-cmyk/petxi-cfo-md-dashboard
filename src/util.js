@@ -1,4 +1,34 @@
 // Shared helpers used across the QIP screens.
+import { BANDS, CRIT_BY_UNIT } from './matrixdata';
+
+// How far a reviewer is through every cell they're expected to score this
+// period — a row counts as "done" whether it's a real grade or an explicit
+// N/A, since both are a completed decision. Drives the "blind" reviewers
+// (Josh, Sandra): the SAR matrix hides everyone else's scores from them
+// until this comes back complete.
+export function reviewerCompletion(data, reviewerName) {
+  const { units, criteria, ofuncs, ocrit, scores, oscores } = data;
+  const critById = Object.fromEntries(criteria.map(c => [c.id, c]));
+  const touched = (rows, match) => rows.some(s => match(s) && s.reviewer === reviewerName);
+  let total = 0, done = 0;
+  BANDS.forEach(b => b.ids.forEach(cid => {
+    if (!critById[cid]) return;
+    units.forEach(u => {
+      total++;
+      if (touched(scores, s => s.criterion_id === cid && s.unit_id === u.id)) done++;
+    });
+  }));
+  units.forEach(u => (CRIT_BY_UNIT[u.id] || []).forEach(cid => {
+    if (!critById[cid]) return;
+    total++;
+    if (touched(scores, s => s.criterion_id === cid && s.unit_id === u.id)) done++;
+  }));
+  ofuncs.forEach(f => ocrit.forEach(c => {
+    total++;
+    if (touched(oscores, s => s.criterion_id === c.id && s.function_id === f.id)) done++;
+  }));
+  return { done, total, complete: total > 0 && done === total };
+}
 
 export const STATUS_LABEL = {
   potential: 'To discuss', queued: 'Queued', live: 'Live',

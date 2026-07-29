@@ -11,10 +11,14 @@ export function weekStart(d = new Date()) {
   x.setHours(0,0,0,0);
   return x.toISOString().slice(0,10);
 }
+// `blind: true` — this reviewer can't see anyone else's scores (or the
+// Agreed column) on the SAR matrix until they've scored every cell
+// themselves, so they're not anchored by scores already on the board while
+// still forming their own independent read.
 export const REVIEWERS = [
   { key: 'ch', name: 'Chris Haresign', short: 'CH' },
   { key: 'fs', name: 'Fleur Sexton',  short: 'FS' },
   { key: 'sb', name: 'Sarah Beavan',  short: 'SB' },
-  { key: 'jh', name: 'Josh Hill',     short: 'JH' },
-  { key: 'sz', name: 'Sandra Zubyte', short: 'SZ' },
+  { key: 'jh', name: 'Josh Hill',     short: 'JH', blind: true },
+  { key: 'sz', name: 'Sandra Zubyte', short: 'SZ', blind: true },
 ];

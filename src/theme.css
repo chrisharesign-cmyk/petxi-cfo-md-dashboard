@@ -54,6 +54,11 @@ tr.band td span{color:#8b959e;font-weight:500;letter-spacing:.03em;text-transfor
    outline, so it doesn't read as an outstanding gap that needs chasing */
 .chip.na{background:var(--line-soft);color:var(--ink-soft);border:1px solid var(--line);font-size:.5rem;font-weight:700}
 .pd.pd-na{background:var(--line-soft);color:var(--ink-soft);border:1px solid var(--line);font-size:.58rem;font-weight:700}
+/* blind-scoring lock — a reviewer's own column stays fully visible; every
+   other reviewer's chip (and Agreed) renders like this until they've
+   scored every cell themselves */
+.chip.hidden{background:var(--ink);color:#f2f0e8;font-size:.75rem;cursor:default}
+.chip.hidden:hover{transform:none}
 .na{color:#c6c2b6}
 .pick-backdrop{position:fixed;inset:0;z-index:59;background:transparent}
 .pick{position:fixed;z-index:60;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(23,34,44,.28);padding:.4rem;width:300px;max-height:calc(100vh - 16px);overflow-y:auto}

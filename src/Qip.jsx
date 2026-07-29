@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { REVIEWERS } from './supa';
 import { setScore, clearScore, setOrgScore, clearOrgScore } from './data';
 import { BANDS, CRIT_BY_UNIT, meanGrade, countdown } from './matrixdata';
-import { finalScoreFor } from './util';
+import { finalScoreFor, reviewerCompletion } from './util';
 
 // Row/column labels are short jargon (eg. "Term pipeline coverage") — hover
 // shows the "on target" descriptor so reviewers know what's being measured.
@@ -45,12 +45,25 @@ function CircleNav({ count, onOpen, label }) {
 }
 
 // Read-only — the agreed score is set from the Agree Scores tab, not here.
-function AgreedChip({ agreed }) {
+function AgreedChip({ agreed, hidden }) {
+  if (hidden) return <button className="chip hidden" disabled title="Hidden until you finish scoring every cell yourself">🔒</button>;
   return (
     <button className={`chip ${agreed ? 's' + agreed : 'empty'}`} disabled
       title={agreed ? `Agreed final score: ${agreed}` : 'Not agreed yet — set it on the Agree Scores tab'}>
       {agreed || '–'}
     </button>
+  );
+}
+
+// A banner explaining the lock, with live progress — silence would just
+// read as a broken matrix, not an intentional blind-review feature.
+function BlindProgress({ done, total }) {
+  return (
+    <div className="card" style={{ marginBottom: '1rem', borderColor: 'var(--xi)' }}>
+      <b>Blind scoring in progress: {done}/{total} cells scored.</b> Everyone else's scores (and the Agreed
+      column) stay hidden from you until you've graded — or marked N/A — every cell, so your own read isn't
+      influenced by theirs. They unlock automatically the moment you finish.
+    </div>
   );
 }
 
@@ -70,6 +83,10 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
   const { units, criteria, ofuncs, ocrit, scores, oscores, period } = data;
   const critById = Object.fromEntries(criteria.map(c => [c.id, c]));
   const colsPerGroup = 2 + (showAgreed ? 0 : REVIEWERS.length);
+
+  const myReviewer = REVIEWERS.find(r => r.key === myKey);
+  const completion = reviewerCompletion(data, myReviewer?.name);
+  const hideOthers = !!myReviewer?.blind && !completion.complete;
 
   // g: a real grade (1-4); na: true if this reviewer has explicitly marked
   // the cell not applicable to them (row exists, score is null) — distinct
@@ -116,6 +133,9 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
     const { g, na, snap } = scoreOf(c.id, uid, rk);
     const mine = rk === myKey;
     const clickable = canEdit && mine;
+    if (hideOthers && !mine) {
+      return <button className="chip hidden" disabled title="Hidden until you finish scoring every cell yourself">🔒</button>;
+    }
     return (
       <button
         className={`chip ${g ? ('s' + g) : na ? 'na' : 'empty'} ${clickable ? '' : 'readonly'}`}
@@ -135,13 +155,14 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
   const GroupCells = ({ c, uid }) => (
     <>
       {!showAgreed && REVIEWERS.map(r => <td key={r.key}><Chip c={c} uid={uid} rk={r.key} /></td>)}
-      <td><AgreedChip agreed={agreedFor(c.id, uid)} /></td>
+      <td><AgreedChip agreed={agreedFor(c.id, uid)} hidden={hideOthers} /></td>
       <td className="circle-cell usep"><CircleCell c={c} uid={uid} /></td>
     </>
   );
 
   return (
     <>
+      {myReviewer?.blind && <BlindProgress done={completion.done} total={completion.total} />}
       <DotLegend showAgreed={showAgreed} />
       <div className="board">
         <table className="matrix">
@@ -201,7 +222,7 @@ export default function Qip({ data, me, myKey, onScore, canEdit, showAgreed, liv
           : <>Locked — {period?.label}. Grades are read-only; the wording shown on hover is what was judged against at lock time.</>}
       </p>
 
-      <OrgMatrix data={data} me={me} myKey={myKey} onScore={onScore} canEdit={canEdit} showAgreed={showAgreed}
+      <OrgMatrix data={data} me={me} myKey={myKey} onScore={onScore} canEdit={canEdit} showAgreed={showAgreed} hideOthers={hideOthers}
         liveCountByCell={liveCountByCell} onOpenArea={onOpenArea} onOpenCriterion={onOpenCriterion} onOpenCase={onOpenCase} />
 
       {pick && (
@@ -256,7 +277,7 @@ function FragmentBand({ band, units, critById, GroupCells, colsPerGroup }) {
   );
 }
 
-function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, liveCountByCell, onOpenArea, onOpenCriterion, onOpenCase }) {
+function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, hideOthers, liveCountByCell, onOpenArea, onOpenCriterion, onOpenCase }) {
   const { ofuncs, ocrit, oscores } = data;
   const colsPerGroup = 2 + (showAgreed ? 0 : REVIEWERS.length);
   const scoreOf = (fid, cid, rk) => {
@@ -290,6 +311,9 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, liveCountByC
   };
   const Chip = ({ f, c, rk }) => {
     const { g, na } = scoreOf(f.id, c.id, rk), mine = rk === myKey, clickable = canEdit && mine;
+    if (hideOthers && !mine) {
+      return <button className="chip hidden" disabled title="Hidden until you finish scoring every cell yourself">🔒</button>;
+    }
     return (
       <button className={`chip ${g ? ('s' + g) : na ? 'na' : 'empty'} ${clickable ? '' : 'readonly'}`}
         onClick={clickable ? (e) => open(e, f, c) : undefined}>{g || (na ? 'N/A' : '–')}</button>
@@ -298,7 +322,7 @@ function OrgMatrix({ data, me, myKey, onScore, canEdit, showAgreed, liveCountByC
   const GroupCells = ({ f, c }) => (
     <>
       {!showAgreed && REVIEWERS.map(r => <td key={r.key}><Chip f={f} c={c} rk={r.key} /></td>)}
-      <td><AgreedChip agreed={agreedFor(f.id, c.id)} /></td>
+      <td><AgreedChip agreed={agreedFor(f.id, c.id)} hidden={hideOthers} /></td>
       <td className="circle-cell usep">
         <CircleNav count={liveCountByCell[`org:${f.id}:${c.id}`] || 0} label={c.name}
           onOpen={() => onOpenCriterion({ scope: 'org', unit_id: null, function_id: f.id, criterion_id: c.id })} />
